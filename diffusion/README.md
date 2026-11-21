@@ -5,6 +5,11 @@ unpaired adversarial diffusion model with a cycle-consistent translation network
 unmodified, at commit `fff3d8449e8c7ba38339be2f9ffd4aa5572beb4b` (also in `../upstream_versions.txt`),
 on the same data, split, eval slices and `evaluate.py` as CycleGAN and CUT.
 
+The original SynDiff shifts its outputs by a few pixels. Section 7 shows why and fixes it: the fixed model
+trains with a copy of `train.py` plus one position-preserving loss. Fixed SynDiff, `diffusion_sc_v1`, reaches
+eval SSIM 0.543 / PSNR 16.15 / MAE 0.124, against CycleGAN's 0.512 / 15.90 / 0.129. It is better on SSIM
+(17/20 patients, p = 0.00017); PSNR and MAE are slightly better on average but not significant.
+
 | File | What it does |
 |---|---|
 | `make_mat.py` | our PNG dataset → SynDiff's six `.mat` files + `test_files.json` + `manifest.json` |
@@ -117,8 +122,8 @@ PNGs go to `/scratch/$USER/syndiff_outputs/diffusion_v1/`, scores to a `diffusio
 **Finding.** SynDiff's outputs come out shifted by whole pixels: up to about 8 px, and by a different amount in
 each run. `shift_check.py` (which slides each output against the real T2) found these best shifts (dy, dx):
 diffusion_v1 (+2, −8), the epoch-5 checkpoint (+2, −8), n500 about (+1, −7), n2000 (+1, 0), and CycleGAN (0, 0).
-A shift like that costs pixel-wise scores (SSIM, PSNR, MAE) even when the anatomy is right. Section 7 tests a
-likely cause and adds a loss against it.
+A shift like that costs pixel-wise scores (SSIM, PSNR, MAE) even when the anatomy is right. Section 7 confirms the
+cause and fixes it in training, so the fixed model needs no alignment.
 
 **Fix, using the input only.** For each output slice, `align_to_input.py` finds the integer shift within
 ±16 px that best overlaps the output's brain silhouette with the silhouette of its **input T1** (`testA`, same
@@ -149,9 +154,9 @@ slice instead of each slice's own; use it if the per-slice shifts look noisy but
 Report scores both with and without alignment, label which is which, and align all three models the same way.
 It takes about 0.2 s per slice (the 200 eval slices take under a minute).
 
-### 7. Why the shift happens, and a position-preserving loss
+### 7. Why the shift happens, and the fix (a position-preserving loss)
 
-**Hypothesis.** Nothing in SynDiff's losses fixes where the anatomy sits:
+**Cause (confirmed).** Nothing in SynDiff's losses fixes where the anatomy sits:
 - The adversarial losses use patch discriminators, which judge local realism and barely see position.
 - The cycle loss only needs the two translation networks to undo each other, so if `gen_non_diffusive_1to2`
   shifts by s and `gen_non_diffusive_2to1` by −s, the cycle still closes.
@@ -161,31 +166,32 @@ SynDiff then passes the shift on to its diffusive generators, which are trained 
 - `gen_diffusive_2` learns to turn `gen_non_diffusive_2to1(T2)` back into that T2, so it learns to apply +s.
 - `gen_diffusive_1` learns to apply −s.
 
-At test time, `gen_diffusive_2` gets a real, unshifted T1 and applies +s. That would also explain why the shift
-differs from run to run: nothing prefers one value of s. CUT and CycleGAN show no shift, which this account does
-not explain.
+At test time, `gen_diffusive_2` gets a real, unshifted T1 and applies +s. Nothing prefers one value of s, which
+fits the shift differing from run to run. (CUT and CycleGAN show no shift, which this account does not explain.)
 
-**Step 1: test it.** `syndiff_shift_cause.sbatch` runs all four generators of one checkpoint on the eval
-slices. It measures each one's shift with `shift_check.py` against the real image of the output's contrast,
-using `--target T1` for the T2 → T1 generators. This is a diagnostic: it chooses nothing.
+**Step 1: the test.** `syndiff_shift_cause.sbatch` runs all four generators of one checkpoint on 50 eval
+slices. It measures each one's shift with `shift_check.py` (radius 10) against the real image of the output's
+contrast, using `--target T1` for the T2 → T1 generators. This is a diagnostic: it chooses nothing.
 
 ```bash
-sbatch diffusion/syndiff_shift_cause.sbatch syndiff_n7514 30 n7514
-# just the reverse diffusive direction:
-sbatch diffusion/syndiff_infer.sbatch syndiff_n7514 30 n7514 diffusion_v1_dir1 1
+sbatch diffusion/syndiff_shift_cause.sbatch syndiff_n7514 30 n7514                   # original
+sbatch diffusion/syndiff_shift_cause.sbatch sc_n7514_silhouette_0.5 30 n7514         # fixed (step 2)
 ```
 
-| generator | direction | expected if the hypothesis holds (diffusion_v1) |
-|---|---|---|
-| `gen_diffusive_2` | T1 → T2 | (+2, −8), already measured |
-| `gen_non_diffusive_1to2` | T1 → T2 | (+2, −8) |
-| `gen_diffusive_1` | T2 → T1 | (−2, +8) |
-| `gen_non_diffusive_2to1` | T2 → T1 | (−2, +8) |
+Best shift (dy, dx), i.e. the correction applied to the output (+dy down, +dx right; (+2, −8) means the outputs sit 2 px
+too high and 8 px too far right), with brain SSIM at that shift and unshifted, epoch 30 of each full-data run
+(`results/shift_cause_n7514_e30.txt`, `results/shift_cause_sc_n7514_e30.txt`):
 
-The other outcomes would say:
-- If the translation networks show (0, 0) and only the diffusive ones are shifted, the shift arises in the
-  diffusive training instead.
-- If the two directions are not opposite, the cancelling-in-the-cycle account is wrong.
+| generator | direction | original `syndiff_n7514` | fixed `sc_n7514_silhouette_0.5` |
+|---|---|---|---|
+| `gen_diffusive_2` | T1 → T2 | **(+2, −8)**: 0.519 vs 0.088 unshifted | **(0, 0)**: 0.548 |
+| `gen_non_diffusive_1to2` | T1 → T2 | **(+2, −8)**: 0.423 vs 0.097 | **(0, 0)**: 0.426 |
+| `gen_diffusive_1` | T2 → T1 | **(−2, +8)**: 0.536 vs 0.075 | **(0, 0)**: 0.548 |
+| `gen_non_diffusive_2to1` | T2 → T1 | **(−2, +8)**: 0.448 vs 0.073 | **(0, 0)**: 0.471 |
+
+This is the predicted pattern. Both T1 → T2 generators carry s = (+2, −8), both T2 → T1 generators carry −s,
+and the translation networks show it as well as the diffusive ones. So the shift starts in the cycle and is
+passed on to the diffusive generators. With the silhouette loss, all four come out at (0, 0).
 
 **Step 2: the loss.** `syndiff_train_sc.py` is SynDiff's `train.py` with a minimal diff. Every added line ends
 in `# [sc]`, and SynDiff itself is untouched. It adds `--struct_loss {none,silhouette,mind}` with weight
@@ -215,7 +221,7 @@ The terms are printed every 100 iterations under train.py's loss line. `--struct
 none of the added code, so it trains exactly as `train.py` does; `test_struct_loss.py` checks this from the
 source. Both training scripts apply the same wrapper patches (`run_syndiff_train.apply_patches`).
 
-**Starting weights.**
+**Starting weights (set before the sweep).**
 - **MIND.** The two papers that add a MIND loss to an unpaired cycle model both weight it at half the cycle
   weight: Yang et al. 2018 (λ_cycle 10, λ_structure 5, L1 on MIND) and Xu et al. 2020 (λ_cyc 10, λ_MIND 5).
   SynDiff's cycle weight is 0.5 (`--lambda_l1_loss`, which also weights its L1 terms), so the same per-term ratio
@@ -242,11 +248,18 @@ sbatch diffusion/syndiff_val.sbatch syndiff_n500 n500
 sbatch diffusion/syndiff_val.sbatch sc_n500_mind_0.25 n500      # ... and the other three
 python diffusion/score_val.py --select                         # the ranking, by the rule below
 
-# the selected loss and weight on all the data, then validation again for its epoch
-sbatch diffusion/syndiff_sc_train.sbatch n7514 30 <loss> <lambda>
-sbatch diffusion/syndiff_val.sbatch sc_n7514_<loss>_<lambda> n7514
-sbatch diffusion/syndiff_shift_cause.sbatch sc_n7514_<loss>_<lambda> <epoch> n7514   # all four should be near (0, 0)
-sbatch diffusion/syndiff_infer.sbatch sc_n7514_<loss>_<lambda> <epoch> n7514 diffusion_sc   # the eval slices, once
+# also on n2000, whose baseline happened to be unshifted
+sbatch diffusion/syndiff_sc_train.sbatch n2000 30 silhouette 0.5
+sbatch diffusion/syndiff_val.sbatch syndiff_n2000 n2000
+sbatch diffusion/syndiff_val.sbatch sc_n2000_silhouette_0.5 n2000
+
+# the selected loss and weight (silhouette 0.5) on all the data, then validation again for its epoch
+sbatch diffusion/syndiff_sc_train.sbatch n7514 30 silhouette 0.5
+sbatch diffusion/syndiff_val.sbatch syndiff_n7514 n7514
+sbatch diffusion/syndiff_val.sbatch sc_n7514_silhouette_0.5 n7514
+sbatch diffusion/syndiff_shift_cause.sbatch sc_n7514_silhouette_0.5 30 n7514           # all four at (0, 0)
+sbatch diffusion/syndiff_infer.sbatch sc_n7514_silhouette_0.5 30 n7514 diffusion_sc_v1   # eval slices: epoch 30
+sbatch diffusion/syndiff_infer.sbatch sc_n7514_silhouette_0.5 5 n7514 diffusion_sc_v1_e5 # eval slices: epoch 5
 ```
 
 `syndiff_val.sbatch` writes one row per run and epoch, `<exp>_e<epoch>`, to `results/syndiff_val/val_results.csv`.
@@ -279,11 +292,80 @@ them in the eval subset. They are the same 5 patients for n500, n2000 and n7514.
    back into any choice.
 
 `score_val.py --select` applies steps 1–5. It reads the data size from the run name (`<exp>_e<epoch>`, the
-`n<N>` part of `<exp>`), so keep the default experiment names.
+`n<N>` part of `<exp>`), so keep the default experiment names. In the end, step 6 was applied differently for
+the headline number; see "Final eval results" below.
 
-**Caution.** The baseline n2000 run happened to come out almost unshifted, so one unshifted run with the loss
-proves little. Look also for the `nd_1to2` / `nd_2to1` terms falling in the training log, and for
-`syndiff_shift_cause.sbatch` on the selected run showing about (0, 0) for all four generators.
+#### Results: n500 sweep (validation patients, 241 slices)
+
+All runs used n500, 30 epochs, seed 1024. The quality floor is 0.290, the aligned SSIM of `syndiff_n500_e30`.
+Full table: `results/syndiff_val/val_results.csv`.
+
+| run | best raw val SSIM (epoch) | PSNR | MAE | median shift, epochs 5–30 | passes the rule |
+|---|---|---|---|---|---|
+| baseline `syndiff_n500` | 0.148 (e20); e30: 0.124, aligned 0.290 | 12.42 | 0.171 | drifts from (0, −1) to (0, −5) | no: shifted from e10 on; e5 is below the floor |
+| **silhouette 0.5** | **0.440 (e30)** | 15.25 | 0.126 | (0, 0) | **yes: selected** |
+| silhouette 2 | 0.4195 (e30) | 14.85 | 0.137 | (0, 0) | yes, below silhouette 0.5 |
+| mind 0.25 | −0.059 (e30) | 11.18 | 0.207 | (0, 0) | no: below the floor at every epoch |
+| mind 1 | −0.066 (e5), falling to −0.130 (e30) | 11.98 | 0.195 | (0, 0) | no: below the floor at every epoch |
+
+- **Silhouette.** Both weights remove the shift at every epoch from 5 on. From epoch 20 on, both beat the
+  baseline's best aligned score.
+  λ = 0.5 is higher than λ = 2 at every epoch from 15 on. `score_val.py --select` on the n500 rows picks
+  `sc_n500_silhouette_0.5_e30`.
+- **MIND.** It removes the shift too, but breaks the translation. Validation SSIM is negative at every epoch from
+  5 on (−0.06 to −0.14). That is far below the baseline and around the level of doing nothing: the input T1
+  scored as the T2 gets −0.130 on the eval slices. The do-nothing baseline was not scored on the validation
+  patients. We did not investigate why MIND fails here.
+
+**n2000.** The baseline n2000 run happened to be unshifted (within 1 px) at every epoch. The fix still raised raw
+validation SSIM at the best epoch, from 0.542 (`syndiff_n2000_e10`) to 0.580 (`sc_n2000_silhouette_0.5_e10`).
+Both runs peak at epoch 10.
+
+#### Results: full data, validation patients
+
+`sc_n7514_silhouette_0.5` is unshifted at every epoch, unlike `syndiff_n7514`. It also scores higher *raw* than
+the original does *after alignment* at every epoch. Quality floor: 0.551 (`syndiff_n7514_e15`, aligned).
+
+| epoch | original raw SSIM | original shift | original aligned SSIM | fixed raw SSIM (shift 0, 0) | fixed PSNR | fixed MAE |
+|---|---|---|---|---|---|---|
+| 5 | 0.114 | (+1, −7) | 0.525 | **0.585** | 16.52 | 0.115 |
+| 10 | 0.109 | (+2, −7) | 0.550 | 0.581 | 16.66 | 0.113 |
+| 15 | 0.104 | (+2, −8) | 0.551 | **0.585** | 16.43 | 0.118 |
+| 20 | 0.107 | (+2, −8) | 0.546 | 0.577 | 16.27 | 0.122 |
+| 25 | 0.110 | (+2, −8) | 0.539 | 0.578 | 16.32 | 0.120 |
+| 30 | 0.109 | (+2, −8) | 0.527 | 0.568 | 16.24 | 0.120 |
+
+By the validation rule, epochs 5 and 15 tie at 0.585, and the lower MAE selects epoch 5.
+
+#### Final eval results (200 eval slices, 20 patients, brain-masked)
+
+| model | SSIM | PSNR (dB) | MAE |
+|---|---|---|---|
+| identity (input T1 scored as T2) | −0.130 | 7.70 | 0.375 |
+| CUT (`cut_v1`) | 0.146 | 13.17 | 0.171 |
+| CycleGAN (`cyclegan_v1`) | 0.512 | 15.90 | 0.129 |
+| SynDiff original (`diffusion_v1`), raw | 0.105 | 12.04 | 0.190 |
+| SynDiff original, aligned (section 6) | 0.507 | 15.82 | 0.127 |
+| **SynDiff fixed (`diffusion_sc_v1`, epoch 30)** | **0.543** | **16.15** | **0.124** |
+| SynDiff fixed, validation-selected epoch 5 (`diffusion_sc_v1_e5`), secondary | 0.566 | 16.43 | 0.121 |
+
+The fixed SynDiff needs no alignment. Against CycleGAN, the best GAN, it is better on SSIM (17/20 patients,
+p = 0.00017); PSNR and MAE are slightly better on average but not significant.
+- **SSIM:** higher patient-mean brain SSIM for **17 of 20 patients**; **Wilcoxon signed-rank p = 0.00017**
+  (two-sided, paired over the 20 patient means of `results/*_eval_per_slice.csv`).
+- **PSNR and MAE:** 16.15 vs 15.90 dB and 0.124 vs 0.129. Each is better for 12 of 20 patients, with
+  p = 0.28 and p = 0.29 on the same test.
+
+Figure: `figures/final_four_models.png`.
+
+Caveats:
+- **Single run per model.** One training run (one seed) each, so the difference includes run-to-run variation we
+  have not measured. The shift itself varied between runs.
+- **Only SSIM is significant.** Claim the SSIM result; describe the PSNR and MAE gains as small and not
+  significant.
+- **Epoch 30 is the headline** because it uses the same rule as the GANs: the final epoch of the run. It is not
+  the validation choice. The validation-selected epoch 5 is reported as secondary (eval SSIM 0.566). Neither
+  choice used eval numbers.
 
 References:
 - Heinrich et al., "MIND: Modality independent neighbourhood descriptor for multi-modal deformable

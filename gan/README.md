@@ -10,7 +10,7 @@ generate a T2-weighted brain MRI slice from a T1-weighted slice of the same pati
 |---|---|---|
 | CycleGAN (Zhu et al., 2017) | Shrinidhi | [junyanz/pytorch-CycleGAN-and-pix2pix](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix) |
 | CUT (Park et al., 2020) | Shrinidhi | [taesungp/contrastive-unpaired-translation](https://github.com/taesungp/contrastive-unpaired-translation) |
-| Diffusion (SynDiff) | Aditya | [`diffusion/`](../diffusion/README.md) |
+| Diffusion: SynDiff (Özbey et al., 2023) | Aditya | [icon-lab/SynDiff](https://github.com/icon-lab/SynDiff); our scripts and findings in [`diffusion/README.md`](../diffusion/README.md) |
 
 All three use **the same data, the same split, the same test slices and the same evaluation script**.
 
@@ -56,6 +56,12 @@ Identical budget and settings for both (`cut_v1.sbatch`, `cyclegan_v1.sbatch`):
 
 Smoke tests (`cut_smoke.sbatch`, `cyclegan_smoke.sbatch`) ran 2 short epochs on 500 images to check each pipeline end to end.
 
+## Training (SynDiff)
+
+SynDiff uses the same data and eval slices, converted to its `.mat` format. It uses the network and optimiser
+settings from its README, except the epoch count: 30 epochs on all 7,514 slices per contrast, one A100. The scripts, the shift it showed and the fix are in
+[`diffusion/README.md`](../diffusion/README.md).
+
 ## Evaluation
 
 `evaluate.py` scores generated T2 slices against the real T2 **inside the brain mask only** (background excluded,
@@ -77,10 +83,14 @@ Default is the fixed 200-slice eval subset; `--subset all` scores every test sli
 |---|---|---|---|---|---|
 | identity baseline (T1 used as T2) | −0.130 | 7.70 | 0.375 | | |
 | CUT (`cut_v1`) | 0.146 ± 0.092 | 13.17 ± 1.84 | 0.171 ± 0.051 | 0.814 | 20.22 |
-| **CycleGAN (`cyclegan_v1`)** | **0.512 ± 0.129** | **15.90 ± 2.71** | **0.129 ± 0.063** | **0.888** | **22.80** |
-| Diffusion (SynDiff) | see the [top-level README](../README.md#results) | | | | |
+| CycleGAN (`cyclegan_v1`) | 0.512 ± 0.129 | 15.90 ± 2.71 | 0.129 ± 0.063 | 0.888 | 22.80 |
+| SynDiff original (`diffusion_v1`), as generated | 0.105 ± 0.049 | 12.04 ± 1.47 | 0.190 ± 0.043 | 0.773 | 18.13 |
+| SynDiff original, aligned to its input (`diffusion_v1_aligned`) | 0.507 ± 0.125 | 15.82 ± 2.38 | 0.127 ± 0.053 | 0.887 | 22.80 |
+| **SynDiff + silhouette loss (`diffusion_sc_v1`)** | **0.543 ± 0.134** | **16.15 ± 2.65** | **0.124 ± 0.056** | **0.897** | **23.21** |
 
-Side-by-side outputs and error maps: `figures/compare_cut_vs_cyclegan.png`.
+± is the standard deviation over the 200 slices. Side-by-side outputs and error maps:
+`figures/compare_cut_vs_cyclegan.png` and `figures/final_four_models.png`. Slide-ready charts are in
+`figures/slides/` (see its README).
 
 ### Findings so far
 
@@ -114,6 +124,29 @@ brightness of the real T2 ranges 0.18–0.66 across test patients, while the mod
 "typical" level. Part of every model's error is this mismatch rather than wrong anatomy (`intensity_check.py`).
 It affects all models, so the comparison stays fair. Failure-case example: on `BraTS2021_01163_s094` CycleGAN
 makes the tumour much brighter than in the real T2.
+
+**6. SynDiff's outputs were shifted by whole pixels; the cause is confirmed and fixed in training.** The original
+SynDiff produced realistic T2s placed 8 px too far right and 2 px too high (best correction (dy, dx) = (+2, −8)),
+which drops its brain SSIM to 0.105. CycleGAN and CUT are not shifted (their best correction is (0, 0)). The cause:
+- Neither the adversarial nor the cycle loss constrains position, so its two translation networks learned
+  opposite shifts that cancel in the cycle.
+- Its diffusive generators inherit them. All four generators measure (+2, −8) or (−2, +8)
+  (`results/shift_cause_n7514_e30.txt`).
+
+The fix is a silhouette loss: L1 between each output's soft brain mask and its own source's mask. It brings all
+four to (0, 0). The loss type and weight were chosen on validation patients outside the eval set. MIND, the
+alternative, removed the shift but broke the translation.
+
+With the loss, SynDiff needs no post-processing and beats CycleGAN, the best GAN. It is better on SSIM
+(17/20 patients, p = 0.00017); PSNR and MAE are slightly better on average but not significant. The p-value is a
+paired Wilcoxon signed-rank test over the 20 patient means.
+
+Caveats:
+- One training run per model.
+- Epoch 30, SynDiff's final epoch, is reported, matching the GANs' final-epoch rule. The validation-selected
+  epoch 5 scores eval SSIM 0.566.
+
+Details: [`diffusion/README.md`](../diffusion/README.md), section 7.
 
 ---
 
@@ -205,9 +238,11 @@ At minimum, generate the 200 files listed under `eval_subset.files` in `split.js
 | `evaluate.py` | masked SSIM / PSNR / MAE → `results/` |
 | `compare_outputs.py` | side-by-side comparison figure with error maps |
 | `intensity_check.py` | per-patient brightness of real vs generated T2 |
-| `shift_check.py` | checks whether outputs are spatially offset from the real T2 |
+| `shift_check.py` | checks whether outputs are spatially offset from the real T2 (`--target T1` for T2 → T1 outputs) |
 | `polarity_check.py` | does fine detail follow the input T1 or the real T2? |
 | `patches/cut_grayscale.patch` | our one-line fix to CUT's data loader |
-| `upstream_versions.txt` | exact commits of the two model repos we used |
-| `results/` | results table and per-slice scores |
+| `upstream_versions.txt` | exact commits of the three model repos we used |
+| `diffusion/` | SynDiff: data conversion, training and inference jobs, shift diagnosis, silhouette loss, validation selection ([README](../diffusion/README.md)) |
+| `results/` | results table and per-slice scores; `syndiff_val/` holds SynDiff's validation scores |
 | `figures/` | alignment, preprocessing and comparison figures |
+| `figures/make_slide_figures.py`, `figures/make_closeups.py` | the presentation figures in `figures/slides/` |

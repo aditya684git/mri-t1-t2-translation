@@ -12,7 +12,7 @@ paired Wilcoxon p = 0.00017).
 **Authors:** Aditya Choudhury and Shrinidhi Kulkarni.
 CPSC 8810 (ML-based Image Synthesis), Clemson University, Fall 2026.
 
-**Blog post:** _coming soon_ (link: `TODO`)
+**Blog post:** <https://aditya684git.github.io/mri-t1-t2-translation/>
 
 ![Input T1, each model's generated T2, real T2, and error maps](figures/final_four_models.png)
 
@@ -32,6 +32,12 @@ Eval subset: 200 axial slices from 20 held-out test patients. Metrics are comput
 | SynDiff, original, outputs re-aligned to the input T1 | 0.507 ± 0.125 | 15.82 ± 2.38 | 0.127 ± 0.053 |
 | **SynDiff + silhouette structure loss (ours)** | **0.543 ± 0.134** | **16.15 ± 2.65** | **0.124 ± 0.056** |
 
+**Which SynDiff epoch?** `diffusion_sc_v1` is **epoch 30**, the final epoch, and is the reported result (the same
+final-epoch rule as the GANs). `diffusion_sc_v1_e5` is **epoch 5**, the epoch selected on the 5 validation patients
+(241 slices, none in the eval subset); it scores 0.566 / 16.43 / 0.121 and is reported as secondary. Neither choice
+used eval numbers. CycleGAN and CUT show no shift: re-aligning them to their input changes nothing
+(`cyclegan_v1_aligned` and `cut_v1_aligned` in `results/results.csv` equal the unaligned scores).
+
 **Is SynDiff + structure loss really better than CycleGAN?** Per-patient paired comparison on the same 20 test
 patients (mean over each patient's 10 slices; two-sided Wilcoxon signed-rank test, exact,
 [`scripts/wilcoxon_per_patient.py`](scripts/wilcoxon_per_patient.py)):
@@ -45,9 +51,14 @@ patients (mean over each patient's 10 slices; two-sided Wilcoxon signed-rank tes
 The SSIM gain is consistent across patients. The PSNR and MAE gains are small and not statistically significant, so
 on intensity error the two models are about level. 20 patients and one training run per model.
 
+Charts of these results (main results, per-patient comparison, data size, shift heatmaps, generator shifts, loss
+sweep, shift drift, close-ups) are in [`figures/slides/`](figures/slides/README.md). `figures/make_slide_figures.py`
+regenerates the charts from the files in `results/`, and `figures/make_closeups.py` makes the close-ups (it needs
+the model outputs, which are not in this repo).
+
 All runs are in [`results/results.csv`](results/results.csv), with per-slice scores alongside. The analyses behind these
-numbers are in [`gan/README.md`](gan/README.md) (CycleGAN vs CUT: contrast polarity, shifts,
-intensity) and [`diffusion/README.md`](diffusion/README.md) (SynDiff: the output shift, its cause, the structure
+numbers are in [`gan/README.md`](gan/README.md) (CycleGAN vs CUT: contrast polarity, a check that
+neither is shifted, intensity) and [`diffusion/README.md`](diffusion/README.md) (SynDiff: the output shift, its cause, the structure
 loss, and the validation-only selection rule).
 
 ---
@@ -86,7 +97,11 @@ loss, and the validation-only selection rule).
 │   └── wilcoxon_per_patient.py   per-patient paired Wilcoxon test between two runs
 │
 ├── results/                  results table, per-slice CSVs, SynDiff validation scores
-└── figures/                  alignment, preprocessing and model-comparison figures
+├── figures/                  alignment, preprocessing and model-comparison figures
+│   ├── slides/               result charts and close-ups (PNG + SVG), with a README
+│   ├── make_slide_figures.py the seven charts, read from results/
+│   └── make_closeups.py      close-ups (needs the model outputs)
+└── docs/                     the project blog post (GitHub Pages)
 ```
 
 No MRI data, model checkpoints or upstream model repositories are included.
