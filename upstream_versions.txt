@@ -1,0 +1,3 @@
+contrastive-unpaired-translation b3ac297708dfb6f7589d04662277e53c0d579c27
+pytorch-CycleGAN-and-pix2pix     2a7afba2895d52556dd5dfe07e8555ef657ced6f
+SynDiff                          fff3d8449e8c7ba38339be2f9ffd4aa5572beb4b

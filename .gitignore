@@ -1,0 +1,53 @@
+# Upstream model repos are cloned separately (see README); never vendor them here
+contrastive-unpaired-translation/
+pytorch-CycleGAN-and-pix2pix/
+SynDiff/
+
+# MRI data: never commit (BraTS licence + size). Download it yourself, see README.
+data/
+extracted/
+brats_t1t2/
+syndiff_data/
+*.nii
+*.nii.gz
+*.mat
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.tar
+*.zip
+*.gz
+
+# Model checkpoints and training outputs
+checkpoints/
+mri_runs/
+syndiff_runs/
+syndiff_outputs/
+*.pth
+*.pt
+*.ckpt
+*.pkl
+*.safetensors
+
+# Secrets and credentials
+.env
+.env.*
+kaggle.json
+.netrc
+*.pem
+*.key
+wandb/
+
+# Slurm logs
+logs/
+*.out
+
+# Python / editor clutter
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

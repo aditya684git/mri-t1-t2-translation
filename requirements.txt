@@ -1,0 +1,15 @@
+# Versions used on Palmetto 2 (Python 3.10). Install torch/torchvision first from the cu126 index:
+#   python -m pip install torch==2.14.1 torchvision==0.29.1 --index-url https://download.pytorch.org/whl/cu126
+# visdom needs: python -m pip install "setuptools<81" && python -m pip install visdom==0.2.4 --no-build-isolation
+numpy==2.2.6
+scipy==1.15.3
+nibabel==5.4.2
+scikit-image==0.25.2
+matplotlib==3.10.9
+pillow==12.3.0
+dominate==2.9.1
+packaging
+GPUtil==1.4.0
+wandb==0.31.0
+kaggle==1.7.4.5
+ipykernel
