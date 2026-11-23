@@ -214,7 +214,7 @@ window.MathJax = {
     <li>We trained computers to <b>turn one kind of brain MRI scan (T1) into another (T2)</b>, using only <em>unmatched</em> scans: the T1s and the T2s came from different patients.</li>
     <li>We compared three methods on exactly the same data, scoring only inside the brain: <span class="m m-cyc">CycleGAN</span>, <span class="m m-cut">CUT</span> and the diffusion model <span class="m m-sd">SynDiff</span>.</li>
     <li><b>Surprise 1:</b> CUT, which we expected to win, did much worse than CycleGAN (brain SSIM 0.146 vs 0.512). It keeps T1's fine light-and-dark pattern instead of flipping it the way a real T2 does.</li>
-    <li><b>Surprise 2:</b> SynDiff's images looked excellent but scored worst of all (0.105). In our full-data run, every T1 → T2 output sat about 8 pixels too far right and 2 pixels too high. Its two translation directions learned equal and opposite shifts, which cancel on a round trip, so training never noticed.</li>
+    <li><b>Surprise 2:</b> SynDiff's images looked realistic by eye but scored worst of all (0.105). In our full-data run, its T1 → T2 outputs sat, as a whole, about 8 pixels too far right and 2 pixels too high: that is the single shift that best lined them up across the scored slices. Its two translation directions learned equal and opposite shifts, which cancel on a round trip, so training never noticed.</li>
     <li><b>The fix:</b> a <em>silhouette loss</em>, which says "the brain outline of every output must sit where its input's outline sits". It removed the shift from all four of SynDiff's generators. <span class="m m-sil">SynDiff + silhouette loss</span> reached brain SSIM 0.543 and beat CycleGAN on 17 of 20 test patients (p = 0.00017). On PSNR and MAE the two are about level.</li>
   </ul>
 </section>
@@ -257,7 +257,7 @@ window.MathJax = {
 
 <p>So here is a tempting question: <b>could a computer look at the style we have and imagine the one we don't?</b> This is called <em>image-to-image translation</em>, and it is what our class project was about. We took T1-weighted brain scans and asked three different machine-learning methods to produce the matching T2-weighted scans.</p>
 
-<p>This post tells the story of that project, including two wrong turns. Our first hypothesis turned out to be backwards. Then the method that looked best turned out to score worst, because of a flaw that is invisible to the eye: its whole output was shifted by a few pixels. We tracked down where the shift comes from, and fixed it with one small extra rule during training. No machine-learning background is needed: we explain every idea as it comes up.</p>
+<p>This post tells the story of that project, including two wrong turns. Our first hypothesis turned out to be backwards. Then the method whose images looked best to our eyes turned out to score worst, because of a flaw that is invisible to the eye: its whole output was shifted by a few pixels. We tracked down where the shift comes from, and fixed it with one small extra rule during training. No machine-learning background is needed: we explain every idea as it comes up.</p>
 
 <h2 id="problem">1. Problem statement</h2>
 
@@ -313,11 +313,11 @@ window.MathJax = {
 
 <h2 id="related">2. Related work</h2>
 
-<p>Our three methods sit on two branches of a family tree. The GAN branch starts with Pix2Pix and leads to CycleGAN and CUT. The diffusion branch leads through DDGAN to SynDiff. Here is that tree, one idea at a time.</p>
+<p>Our three methods sit on two branches of a family tree: GANs (Pix2Pix, then CycleGAN and CUT) and diffusion (DDGAN, then SynDiff).</p>
 
 <h3>2.1 GANs: a forger and a detective</h3>
 
-<p>A <b>generative adversarial network</b> (GAN) [1] trains two neural networks against each other. The <b>generator</b> is a forger: it turns an input (for us, a T1 slice) into an image. The <b>discriminator</b> is a detective: it looks at an image and says whether it is real or forged. Each network is trained by nudging its millions of internal numbers to make a <b>loss</b> smaller; a loss is just a score of how badly the network is doing. The classic GAN objective is:</p>
+<p>A <b>generative adversarial network</b> (GAN) [1] pits two neural networks against each other: the <b>generator</b>, a forger, turns an input (for us, a T1 slice) into an image, and the <b>discriminator</b>, a detective, says whether an image is real or forged. Training nudges each network's millions of internal numbers to shrink its <b>loss</b>, a score of how badly it is doing. The classic GAN objective is:</p>
 
 \[ \begin{aligned} \min_G \max_D \;\; & \mathbb{E}_{y}\big[\log D(y)\big] \\ +\; & \mathbb{E}_{x}\big[\log\big(1 - D(G(x))\big)\big] \end{aligned} \]
 
@@ -331,63 +331,73 @@ window.MathJax = {
 
 <h3>2.2 With pairs: Pix2Pix</h3>
 
-<p><b>Pix2Pix</b> [3] (Isola et al., CVPR 2017) is the paired version. Alongside the GAN loss, it directly compares each output with its true target pixel by pixel. It also popularised a detective that judges many small, overlapping patches of the image (each 70 × 70 pixels) instead of the whole image at once, called a <b>PatchGAN</b>. CycleGAN, CUT and SynDiff's translation networks all use this patch-based kind; SynDiff's diffusion detectives are different and give a single score for the whole image (Section 3.4). Pix2Pix needs matched pairs, so it is not an option in our unpaired setting. With pairs it would be a natural "upper bound", and we list it as future work.</p>
+<p><b>Pix2Pix</b> [3] (Isola et al., CVPR 2017) is the paired version: alongside the GAN loss, it compares each output with its true target pixel by pixel. It also popularised the <b>PatchGAN</b>, a detective that judges 70 × 70-pixel patches rather than the whole image, used by CycleGAN, CUT and SynDiff's translation networks (SynDiff's diffusion detectives score the whole image; Section 3.4). Pix2Pix needs pairs, so for us it is a future-work "upper bound".</p>
 
 <h3>2.3 Without pairs: CycleGAN</h3>
 
-<p><b>CycleGAN</b> [4] (Zhu et al., ICCV 2017) removes the need for pairs with one clever idea: <b>cycle consistency</b>. It trains two generators, one for T1 → T2 and one for T2 → T1. If you translate a sentence from English to French and back, you should get your original sentence; likewise, a T1 translated to T2 and back should return the original T1. That round-trip check, the <b>cycle loss</b>, ties each output to its input without ever seeing a pair. CycleGAN assumes that a translation which can be undone must have kept the content. As we will see, a translation can be undone even when it gets something wrong.</p>
+<p><b>CycleGAN</b> [4] (Zhu et al., ICCV 2017) removes the need for pairs with <b>cycle consistency</b>: it trains T1 → T2 and T2 → T1 generators, and, like a sentence translated to French and back, a T1 sent to T2 and back should return unchanged. This <b>cycle loss</b> ties each output to its input without pairs, assuming that a translation which can be undone has kept the content. As we will see, a translation can be undone even when it gets something wrong.</p>
 
 <h3>2.4 Contrastive translation: CUT</h3>
 
-<p><b>CUT</b> (Contrastive Unpaired Translation) [5] (Park et al., ECCV 2020) drops the second generator. It ties output to input with <b>contrastive learning</b> on small patches instead. Pick a patch of the output; the input patch from the <em>same location</em> should look more similar to it, as the network sees them, than input patches from other locations do. This is called the PatchNCE loss. The authors report better quality than two-sided methods such as CycleGAN, with less training time, on natural-image benchmarks. <b>Our project proposal hypothesised that CUT would keep fine anatomical structure better than CycleGAN</b>, because PatchNCE ties every output patch to its own input patch. Section 4.1 tests that.</p>
+<p><b>CUT</b> (Contrastive Unpaired Translation) [5] (Park et al., ECCV 2020) drops the second generator and uses <b>contrastive learning</b> on patches instead: an output patch should look more like the input patch from the <em>same location</em> than like input patches from elsewhere (the PatchNCE loss). The authors report better quality and less training time than two-sided methods such as CycleGAN on natural-image benchmarks. <b>Our proposal hypothesised that CUT would keep fine anatomical structure better than CycleGAN</b>; Section 4.1 tests that.</p>
 
 <h3>2.5 Cheating the round trip, and geometry constraints</h3>
 
-<p>A round-trip check can be passed without doing the job honestly. Chu, Zhmoginov and Sandler [18] showed that CycleGAN can hide information about its input inside its output as a faint, almost invisible pattern, then read that pattern back on the return trip. The cycle loss is satisfied even though the visible translation is not faithful. They called CycleGAN "a master of steganography" (the art of hiding messages in plain sight).</p>
+<p>A round trip can be passed without doing the job honestly. Chu, Zhmoginov and Sandler [18] showed that CycleGAN can hide a faint, almost invisible pattern in its output and read it back on the return trip, satisfying the cycle loss even when the visible translation is unfaithful: "a master of steganography" (hiding messages in plain sight).</p>
 
-<p>Other work ties input and output together with <em>geometry</em> instead of a round trip. <b>DistanceGAN</b> [19] (Benaim and Wolf, NeurIPS 2017) asks the translation to preserve distances between images: two inputs that are far apart should give outputs that are far apart. <b>GcGAN</b> [20] (Fu et al., CVPR 2019) asks the translation to "commute" with a simple geometric change. Translating a flipped or rotated input should give the flipped or rotated version of the normal output.</p>
+<p>Other work ties input and output with <em>geometry</em> instead. <b>DistanceGAN</b> [19] (Benaim and Wolf, NeurIPS 2017) preserves distances: inputs that are far apart should give outputs that are far apart. <b>GcGAN</b> [20] (Fu et al., CVPR 2019) requires that translating a flipped or rotated input gives the flipped or rotated version of the normal output.</p>
 
 <h3>2.6 Diffusion models: DDPM, DDGAN, SDEdit, DDIB</h3>
 
-<p><b>Diffusion models</b> learn to remove noise. During training, a clean image is gradually buried in random noise, and a network learns to undo one small step of that corruption. To generate, you start from pure noise and apply the network again and again. <b>DDPM</b> [6] (Ho et al., NeurIPS 2020) showed this produces excellent images, but it takes about a thousand small denoising steps, which is slow. <b>DDGAN</b> (denoising diffusion GANs) [7] (Xiao et al., ICLR 2022) noticed that small steps are needed only because each step is modelled with a simple bell-curve (Gaussian) guess. Instead, it takes a few <em>large</em> steps and trains each step like a small GAN: a generator proposes the less noisy image, and a detective judges whether it looks like a real denoising step. That cuts sampling down to a handful of steps.</p>
+<p><b>Diffusion models</b> learn to remove noise: training buries clean images in noise and teaches a network to undo one small step, and generating applies that network again and again, starting from pure noise. <b>DDPM</b> [6] (Ho et al., NeurIPS 2020) produces high-quality images but needs about a thousand small, slow steps. <b>DDGAN</b> [7] (Xiao et al., ICLR 2022) takes a few <em>large</em> steps, each trained like a small GAN, cutting sampling to a handful of steps.</p>
 
-<p>Diffusion models can also translate without pairs. <b>SDEdit</b> [8] (Meng et al., ICLR 2022) adds some noise to an input image and then denoises it with a model trained only on the target style. The amount of noise trades realism against faithfulness to the input. <b>DDIB</b> [9] (Su et al., ICLR 2023) trains one diffusion model per style and translates by encoding the source image into noise with one model and decoding it with the other. We did not run these methods; they are natural next baselines.</p>
+<p>Diffusion can also translate without pairs. <b>SDEdit</b> [8] (Meng et al., ICLR 2022) noises the input and denoises it with a model trained only on the target style; <b>DDIB</b> [9] (Su et al., ICLR 2023) encodes the source into noise with one style's model and decodes it with the other's. We did not run these; they are natural next baselines.</p>
+
+<p>Newer examples: <b>UNSB</b> [24] (Kim et al., ICLR 2024) trains unpaired translation as a series of adversarial steps along a learned random path between the two image collections (a Schrödinger bridge), much as SynDiff trains its large steps. <b>FGDM</b> [25] (Li et al., IEEE Transactions on Medical Imaging 2024) trains only on the target modality and guides it with frequency-filtered versions of the source to keep anatomy in place, warning that translation can "distort, shift, or even remove structures".</p>
+
+<details class="ml"><summary>Details for ML readers: diffusion background</summary>
+<ul>
+  <li>DDGAN's argument: small steps are needed only because each reverse step is modelled with a simple bell-curve (Gaussian) guess. With large steps the true denoising distribution is complex, so DDGAN models each step with a conditional GAN (a generator proposes the less noisy image, a discriminator judges it).</li>
+  <li>In SDEdit, the amount of added noise trades realism against faithfulness to the input.</li>
+  <li>UNSB expresses the Schrödinger-bridge problem as a sequence of adversarial learning problems.</li>
+</ul>
+</details>
 
 <h3>2.7 Diffusion for unpaired medical translation: SynDiff</h3>
 
-<p><b>SynDiff</b> [10] (Özbey, Dalmaz et al., IEEE Transactions on Medical Imaging 2023) brings DDGAN's few-large-steps idea to unpaired medical image translation. Its problem: a diffusion model that translates T1 → T2 needs to be <em>conditioned</em> on a T1, and training that normally needs pairs. SynDiff's answer is to include a CycleGAN-style pair of translation networks whose job is to manufacture the missing half of each pair. A diffusion generator then learns from those manufactured pairs (details in <a href="#syndiff">Section 3.4</a>). The authors evaluated it on multi-contrast MRI and MRI–CT translation and report "quantitatively and qualitatively superior performance against competing baselines", including GAN and diffusion models. We used the official code, unmodified.</p>
+<p><b>SynDiff</b> [10] (Özbey, Dalmaz et al., IEEE Transactions on Medical Imaging 2023) brings DDGAN's few-large-steps idea to unpaired medical translation. A T1 → T2 diffusion model must be <em>conditioned</em> on a T1, which normally needs pairs, so SynDiff adds a CycleGAN-style pair of translation networks that manufacture the missing half of each pair (<a href="#syndiff">Section 3.4</a>). The authors report "quantitatively and qualitatively superior performance against competing baselines" on multi-contrast MRI and MRI–CT translation, including GAN and diffusion models. We used the official code, unmodified.</p>
 
 <h3>2.8 When translation goes wrong: hallucination and structure losses</h3>
 
-<p>Cohen, Luck and Honari [11] (MICCAI 2018) gave a sobering demonstration. They trained translation models on target images that had too many or too few tumours, and the translated images gained or lost tumours to match. This happens because GAN-style losses match the <em>overall look</em> of the target collection, not the facts of each image. This is why we score against the real T2 of each patient instead of judging realism.</p>
+<p>Cohen, Luck and Honari [11] (MICCAI 2018) showed that translation models trained on targets with too many or too few tumours add or remove tumours to match: GAN-style losses match the <em>overall look</em> of the target collection, not the facts of each image. So we score against each patient's real T2, not realism.</p>
 
-<p>One way to keep structure in place is a loss that compares the <em>layout</em> of input and output while ignoring their brightness. <b>MIND</b> [12] (Heinrich et al., Medical Image Analysis 2012) describes each pixel by how similar its small neighbourhood is to the neighbourhoods around it. That description stays roughly the same across MRI contrasts, which makes it useful for aligning scans of different types, the job it was designed for. Yang et al. [13] used a MIND loss to constrain a CycleGAN for brain MR → CT translation. MIND was one of the two fixes we tried.</p>
+<p>A loss that compares the <em>layout</em> of input and output, ignoring brightness, can keep structure in place. <b>MIND</b> [12] (Heinrich et al., Medical Image Analysis 2012), designed for aligning scans of different types, describes each pixel by how similar its neighbourhood is to nearby ones, which stays roughly the same across MRI contrasts. Yang et al. [13] used it to constrain a CycleGAN for brain MR → CT. It was one of our two candidate fixes.</p>
 
 <h3>2.9 The data: BraTS 2021</h3>
 
-<p>The <b>BraTS 2021</b> benchmark [14] (Baid et al.), building on earlier BraTS releases [15, 16], provides brain MRI from patients with gliomas (a type of brain tumour). Each of the 1,251 training cases has four contrasts aligned to each other (T1, contrast-enhanced T1, T2 and FLAIR). They are <em>skull-stripped</em> (the skull and scalp are removed, leaving only the brain) and stored as 240 × 240 × 155 volumes. We use only T1 and T2.</p>
+<p>The <b>BraTS 2021</b> benchmark [14] (Baid et al.), building on earlier releases [15, 16], provides brain MRI of patients with gliomas (a type of brain tumour): 1,251 training cases, each with four aligned contrasts (T1, contrast-enhanced T1, T2 and FLAIR), <em>skull-stripped</em> (skull and scalp removed) and stored as 240 × 240 × 155 volumes. We use only T1 and T2.</p>
 
 <h3>2.10 Why these three methods, and what is new</h3>
 
-<p><b>Why these three?</b> CycleGAN and CUT are the most widely used one-input, one-output unpaired GANs: one checks a round trip, the other matches patches in one direction only. SynDiff is a recent diffusion model built for exactly our task, with public code. Other families such as UNIT [21] and MUNIT [22] (which pass images through a shared hidden code and can produce several different outputs for one input) and attention-guided GANs [23] (which learn where in the image to translate) add more moving parts, which would blur a three-way comparison. The SynDiff paper already compares against them [10].</p>
+<p><b>Why these three?</b> CycleGAN and CUT are the most widely used one-input, one-output unpaired GANs; SynDiff is a recent diffusion model built for exactly our task, with public code. UNIT [21], MUNIT [22] and attention-guided GANs [23] add moving parts (a shared hidden code, several outputs per input, learned attention) that would blur a three-way comparison, and the SynDiff paper already compares against them [10].</p>
 
 <ul>
-  <li><b>A same-data, brain-only comparison.</b> A GAN (CycleGAN), a contrastive GAN (CUT) and a diffusion model (SynDiff) were trained on the same unpaired, patient-level split. All three were scored on the same 200 test slices with the same brain-only metrics, and compared patient by patient with a statistical test.</li>
-  <li><b>A hidden, cycle-cancelled shift in SynDiff.</b> Chu et al. [18] showed that a cycle loss can be satisfied by hidden, near-invisible information. Our shift is a <em>geometric</em> version of the same loophole: the two translation directions carry equal and opposite shifts, which cancel on the round trip. We found it in a diffusion model, whose diffusion generators then inherit the shift. A four-generator experiment confirms it.</li>
-  <li><b>A simple silhouette loss that removes it.</b> It is related to geometry-consistency constraints such as GcGAN [20], but it needs no flip or rotation, only the input's own brain outline. It is chosen using validation patients only, needs no post-processing, and gives SynDiff the best SSIM in our single-run comparison.</li>
+  <li><b>A same-data, brain-only comparison</b> of a GAN, a contrastive GAN and a diffusion model: same unpaired, patient-level split, same 200 test slices, same brain-only metrics, plus a patient-by-patient statistical test.</li>
+  <li><b>A hidden, cycle-cancelled shift in SynDiff</b>: a <em>geometric</em> version of Chu et al.'s loophole [18], with equal and opposite shifts that cancel on the round trip, found in a diffusion model whose diffusion generators inherit it. A four-generator experiment confirms it.</li>
+  <li><b>A simple silhouette loss that removes it</b>, related to geometry-consistency constraints such as GcGAN [20] but needing only the input's own brain outline. Chosen on validation patients only, it needs no post-processing and gives SynDiff the best SSIM in our single-run comparison.</li>
 </ul>
 
 <h2 id="approach">3. Approach</h2>
 
 <h3 id="data">3.1 Data: from hospital volumes to training slices</h3>
 
-<p><b>Input:</b> the BraTS 2021 T1 and T2 volumes. <b>Output:</b> folders of 256 × 256 grayscale PNG slices, plus a record of every choice (<code>split.json</code>). Our script <code>preprocess.py</code> does five things:</p>
+<p><b>Input:</b> the BraTS 2021 T1 and T2 volumes. <b>Output:</b> 256 × 256 grayscale PNG slices and a record of every choice (<code>split.json</code>). Our script <code>preprocess.py</code> does five things:</p>
 <ol>
-  <li><b>Split by patient.</b> Pick 400 of the 1,251 patients at random (with a fixed random seed, 42, so the choice can be repeated). 160 patients provide only T1 slices for training, a <em>different</em> 160 provide only T2 slices, and 80 are held out for testing. No patient appears in two groups, so training is truly unpaired and the test patients are never seen.</li>
-  <li><b>Normalise brightness per scan.</b> MRI brightness has no fixed units, so each volume is clipped to the 0.5th–99.5th percentile of its brain voxels (the 3D version of pixels) and scaled to 0–1. Background stays exactly 0. Clipping ignores the few extreme pixels.</li>
-  <li><b>Choose slices.</b> Keep horizontal (axial) slices whose brain area is at least 40% of that volume's largest slice, which skips the nearly empty top and bottom. Then keep every second one, since neighbouring slices are near-duplicates.</li>
-  <li><b>Format.</b> Rotate upright, pad 240 → 256 with black, save as 8-bit grayscale PNG.</li>
-  <li><b>Answer key.</b> For test patients, save the T1, the T2 and the brain mask under identical filenames.</li>
+  <li><b>Split by patient.</b> 400 of the 1,251 patients, picked at random (fixed seed 42): 160 give only T1 slices for training, a <em>different</em> 160 only T2, and 80 are held out for testing. No patient is in two groups, so training is truly unpaired.</li>
+  <li><b>Normalise brightness per scan.</b> MRI brightness has no fixed units, so each volume is clipped to the 0.5th–99.5th percentile of its brain voxels (3D pixels) and scaled to 0–1; background stays 0.</li>
+  <li><b>Choose slices.</b> Keep horizontal (axial) slices with at least 40% of the volume's largest brain area, then every second one (neighbours are near-duplicates).</li>
+  <li><b>Format.</b> Rotate upright, pad 240 → 256 with black, save as 8-bit PNG.</li>
+  <li><b>Answer key.</b> For test patients, save the T1, T2 and brain mask under identical filenames.</li>
 </ol>
 
 <div class="table-wrap">
@@ -404,9 +414,9 @@ window.MathJax = {
 </div>
 <p class="tcap"><b>Table 1.</b> Our split of BraTS 2021. All numbers from <code>split.json</code> and <code>results/syndiff_val/val_results.csv</code>.</p>
 
-<p><b>Why only 20 of the 80 test patients?</b> We fixed a 200-slice test subset (20 patients × 10 evenly spaced slices) at the very start, when <code>preprocess.py</code> prepared the data and before we had any results. That way every model and every checkpoint (a saved copy of a model partway through training) is scored on exactly the same slices: all 20 scored runs in <code>results/results.csv</code> use them. It also keeps evaluation quick. Scoring all held-out patients is future work.</p>
+<p><b>Why only 20 of the 80 test patients?</b> We fixed a 200-slice test subset (20 patients × 10 evenly spaced slices) at the very start, before we had any results, so that every model and every checkpoint (a saved copy of a model partway through training) is scored on exactly the same slices: all 20 scored runs in <code>results/results.csv</code> use them. It also keeps evaluation quick. Scoring all held-out patients is future work.</p>
 
-<p><b>Assumption: T1 and T2 line up.</b> Scoring an output pixel by pixel against the real T2 only makes sense if a patient's T1 and T2 are perfectly aligned. We checked this on 5 random patients with <code>check_alignment.py</code>. Shapes and positions match exactly, and the brain outlines overlap with a <b>Dice score</b> of 1.000. Dice measures the overlap of two shapes:</p>
+<p><b>Assumption: T1 and T2 line up</b>, as pixel-by-pixel scoring requires. On 5 random patients (<code>check_alignment.py</code>), shapes and positions match exactly and the brain outlines overlap with a <b>Dice score</b> of 1.000. Dice measures the overlap of two shapes:</p>
 
 \[ \text{Dice}(A,B) = \frac{2\,|A \cap B|}{|A| + |B|} \]
 
@@ -458,13 +468,13 @@ window.MathJax = {
 
 <p class="eq-note">In words: translate there and back in both directions, and measure the average absolute pixel difference from the starting image (that is what \(\lVert\cdot\rVert_1\) means).</p>
 
-<p>The full objective adds a GAN loss for each generator and an "identity" loss, which says a T2 fed to the T1 → T2 generator should come out unchanged:</p>
+<p>The full objective adds a GAN loss for each generator and an "identity" loss (a T2 fed to the T1 → T2 generator should come out unchanged):</p>
 
 \[ \begin{aligned} \mathcal{L} \;=\; & \mathcal{L}_{\text{GAN}}(G, D_{T2}) + \mathcal{L}_{\text{GAN}}(F, D_{T1}) \\ +\; & 10\,\mathcal{L}_{\text{cyc}} + 5\,\mathcal{L}_{\text{idt}} \end{aligned} \]
 
 <p class="eq-note">In words: look real, survive the round trip (weighted 10 times a GAN term), and don't change an image that is already in the target style.</p>
 
-<p><b>Design choices:</b> we used the official code with its default settings, trained on single-channel (grayscale) 256 × 256 slices for 60 epochs. <b>Assumptions:</b> the T1 → T2 mapping can be inverted, and a mapping that can be inverted has preserved the content.</p>
+<p><b>Design choices:</b> the official code and default settings, on grayscale 256 × 256 slices, for 60 <b>epochs</b> (an epoch is one full pass over the training slices). <b>Assumption:</b> the T1 → T2 mapping can be inverted, and a mapping that can be inverted has preserved the content.</p>
 
 <details class="ml"><summary>Details for ML readers</summary>
 <ul>
@@ -476,7 +486,7 @@ window.MathJax = {
 
 <h3 id="cut">3.3 CUT</h3>
 
-<p><b>Input / output:</b> the same as CycleGAN. <b>Networks:</b> one generator (the same design as CycleGAN's), one patch-based detective, and a small helper network that turns each image patch into a short list of numbers so patches can be compared. There is no T2 → T1 generator and no cycle.</p>
+<p><b>Input / output:</b> as for CycleGAN. <b>Networks:</b> one generator (CycleGAN's design), one patch-based detective, and a small helper network that turns each image patch into a short list of numbers for comparison. There is no T2 → T1 generator and no cycle.</p>
 
 <figure class="wide" id="fig4">
   <div class="diagram">
@@ -514,7 +524,7 @@ window.MathJax = {
 
 <p class="eq-note">In words: among one right input patch and \(N\) wrong ones, the output patch should "pick" the right one; the loss is small when its similarity score \(s^{+}\) beats all the others. (\(\tau\) is a fixed scaling constant; see the details box.)</p>
 
-<p>Each training step runs this quiz for 256 patch locations, so each quiz has 1 right answer and 255 wrong ones. CUT's total loss adds this quiz to the usual GAN loss. <b>Design choices:</b> the official code with its default settings and the same training budget as CycleGAN. We changed one line in its data loader, which always read images as colour and crashed on our grayscale slices. <b>Assumption:</b> an output patch should stay recognisably similar to its input patch.</p>
+<p>Each training step runs this quiz at 256 patch locations (1 right answer, 255 wrong) on top of the GAN loss. <b>Design choices:</b> official code, default settings, CycleGAN's training budget, and a one-line fix to its data loader, which read images as colour and crashed on our grayscale slices. <b>Assumption:</b> an output patch should stay recognisably similar to its input patch.</p>
 
 <details class="ml"><summary>Details for ML readers</summary>
 <ul>
@@ -527,7 +537,7 @@ window.MathJax = {
 
 <h3 id="syndiff">3.4 SynDiff</h3>
 
-<p><b>Input:</b> a T1 slice \(s\) (the "source"). <b>Output:</b> a synthetic T2 slice \(\hat{x}_0\), built in 4 denoising steps that start from pure noise. <b>Networks:</b> two diffusion generators (one per direction), two translation generators that form a CycleGAN-style pair, and a detective for each of the four.</p>
+<p><b>Input:</b> a T1 slice \(s\) (the "source"). <b>Output:</b> a synthetic T2 slice \(\hat{x}_0\), built in 4 denoising steps from pure noise. <b>Networks:</b> two diffusion generators (one per direction), two translation generators forming a CycleGAN-style pair, and a detective for each.</p>
 
 <p>First, the diffusion idea in one equation. The <em>forward</em> process corrupts a clean image \(x_0\) a bit at each step \(t\):</p>
 
@@ -535,15 +545,15 @@ window.MathJax = {
 
 <p class="eq-note">In words: shrink the previous image slightly and add Gaussian noise of strength \(\beta_t\); after enough steps, only noise is left.</p>
 
-<p>The <em>reverse</em> process is what we learn: go from noisier to cleaner. SynDiff takes only \(T = 4\) large steps. At each step a <b>diffusive generator</b> \(G_{\text{diff}}\) looks at the noisy image \(x_t\), a <b>source</b> image \(s\) of the other contrast, the step number \(t\), and a random code \(z\). It guesses the clean image, and SynDiff then jumps to a less noisy image consistent with that guess:</p>
+<p>The <em>reverse</em> process is what we learn, in only \(T = 4\) large steps. At each, a <b>diffusive generator</b> \(G_{\text{diff}}\) looks at the noisy image \(x_t\), the <b>source</b> image \(s\), the step \(t\) and a random code \(z\), and guesses the clean image; SynDiff then jumps to a less noisy image consistent with that guess:</p>
 
 \[ \begin{gathered} \hat{x}_0 = G_{\text{diff}}(x_t,\, s,\, t,\, z), \\ x_{t-1} \sim q\big(x_{t-1} \mid x_t, \hat{x}_0\big) \end{gathered} \]
 
-<p class="eq-note">In words: first line, the generator looks at the current noisy image, the T1 and the step number, and guesses the finished T2, \(\hat{x}_0\). Second line, \(x_{t-1} \sim q(\cdots)\) means "draw at random": the next, slightly less noisy image is picked at random from all the images that could have been one step earlier, given the current noisy image and that guess. Because the noise-adding process is known exactly, this range of possibilities has a simple bell-curve shape and needs no extra network. The randomness is why two runs on the same T1 can differ slightly.</p>
+<p class="eq-note">In words: first line, the generator guesses the finished T2, \(\hat{x}_0\). Second line, \(\sim\) means "draw at random": the next, less noisy image is drawn from the images that could have been one step earlier, given the current one and that guess; the noise-adding process is known exactly, so this needs no extra network. That randomness is why runs can differ slightly; we drew one sample per test slice, with a fixed random seed (42).</p>
 
-<p>A step-aware detective judges whether each (\(x_{t-1}\), \(x_t\)) step looks like a real denoising step. Unlike a patch-based detective, it adds up what it sees over every position and gives one score for the whole image.</p>
+<p>A step-aware detective judges whether each (\(x_{t-1}\), \(x_t\)) step looks like a real denoising step; unlike a patch-based detective, it gives one score for the whole image.</p>
 
-<p><b>The trick for unpaired data.</b> To learn "T1 source → T2 image", SynDiff needs matching pairs, which we don't have. So it also trains two <b>translation networks</b>, a CycleGAN-style pair with their own discriminators and cycle loss. To teach the T1 → T2 diffusive generator, it takes a real T2 \(y\), makes a fake T1 \(F(y)\) with the T2 → T1 translation network, and asks the diffusive generator to recover \(y\) from a noisy copy of \(y\) plus \(F(y)\). The manufactured T1 is the source; the real T2 is the target (Figure 5, top).</p>
+<p><b>The trick for unpaired data.</b> SynDiff also trains two <b>translation networks</b>, a CycleGAN-style pair with their own detectives and cycle loss. To teach the T1 → T2 diffusive generator, it turns a real T2 \(y\) into a fake T1 \(F(y)\) and asks for \(y\) back from a noisy copy of \(y\) plus \(F(y)\): the manufactured T1 is the source, the real T2 the target (Figure 5, top).</p>
 
 <figure class="wide" id="fig5">
   <div class="diagram">
@@ -603,13 +613,14 @@ window.MathJax = {
 
 \[ \mathcal{L}_{G} \;=\; \mathcal{L}^{\text{diff}}_{\text{adv}} + \mathcal{L}^{\text{trans}}_{\text{adv}} + 0.5\,\big(\mathcal{L}_{\text{cyc}} + \mathcal{L}^{\text{diff}}_{1}\big) \]
 
-<p class="eq-note">In words: diffusion steps and translations should both look real (the two adversarial terms); the translation networks should survive a round trip; and the diffusive generators' guesses should match the real images they were built from (the "L1" term, an average absolute pixel difference).</p>
+<p class="eq-note">In words: diffusion steps and translations should look real (the two adversarial terms), the translation networks should survive a round trip, and the diffusive generators' guesses should match the real images they were built from (the "L1" term, an average absolute pixel difference).</p>
 
-<p><b>Design choices:</b> SynDiff's official code, unmodified, with the settings from its README and 4 denoising steps. We trained 30 <b>epochs</b> (one epoch is one full pass over the training slices). SynDiff needs equal numbers of T1 and T2 slices, so "all data" means 7,514 slices per contrast. Following Dr. Huang's advice to start with a small dataset and increase it progressively, we trained three separate runs from scratch on 500, 2,000 and 7,514 slices. <b>Assumption:</b> the fake T1s made by the translation network are close enough to real T1s that what the diffusive generator learns from them carries over to real T1s at test time. Section 4.4 shows where that assumption breaks.</p>
+<p><b>Design choices:</b> SynDiff's official code, unmodified, with its README settings and 4 denoising steps, for 30 epochs. SynDiff needs equal numbers of T1 and T2 slices, so "all data" means 7,514 slices per contrast. Following Dr. Huang's advice to start with a small dataset and increase it progressively, we trained three separate runs from scratch on 500, 2,000 and 7,514 slices. <b>Assumption:</b> what the diffusive generator learns from fake T1s carries over to real T1s at test time; Section 4.4 shows where that breaks.</p>
 
 <details class="ml"><summary>Details for ML readers</summary>
 <ul>
   <li>Training arguments (<code>diffusion/syndiff_train.sbatch</code>): <code>--num_timesteps 4 --batch_size 1 --lr_g 1.6e-4 --lr_d 1e-4 --use_ema --ema_decay 0.999 --r1_gamma 1 --lazy_reg 10 --num_channels_dae 64 --ch_mult 1 1 2 2 4 4 --num_res_blocks 2 --z_emb_dim 256</code>, cosine learning-rate schedule, one A100 GPU.</li>
+  <li>The reverse draw \(q(x_{t-1} \mid x_t, \hat{x}_0)\) is the Gaussian posterior of the forward process (a simple bell-curve shape), computed in closed form.</li>
   <li>Generator loss weights are SynDiff's defaults: adversarial terms 1, cycle and diffusive L1 terms 0.5 (<code>--lambda_l1_loss</code>).</li>
   <li>Detectives: the translation networks' discriminators are 70 × 70 PatchGANs. The diffusion discriminators (<code>Discriminator_large</code>) sum their features over all positions before a final linear layer, so they give one score per image.</li>
   <li>SynDiff counts epochs from 0, so <code>--num_epoch 30</code> trains epochs 0–30. A small wrapper (<code>diffusion/run_syndiff_train.py</code>) turns off <code>torch.autograd.set_detect_anomaly</code>, which slows every step, and adds missing optimizer attributes so the EMA optimizer saves and resumes on current PyTorch. SynDiff's own files are unchanged.</li>
@@ -618,21 +629,21 @@ window.MathJax = {
 
 <h3 id="silhouette">3.5 Our addition: the silhouette loss</h3>
 
-<p>Our fix (motivated in Sections 4.3–4.4) is a loss that pins down where the brain sits. First, a soft "is this pixel brain?" switch:</p>
+<p>Our fix (motivated in Sections 4.3–4.4) pins down where the brain sits. First, a soft "is this pixel brain?" switch:</p>
 
 \[ m(x) \;=\; \sigma\!\left(\frac{x - 0.03}{0.006}\right) \]
 
 <p class="eq-note">In words: \(\sigma\) is the S-shaped sigmoid function, so \(m\) is about 0 on the black background and about 1 on brain tissue, switching over at a brightness of about 0.03 (8 out of 255).</p>
 
-<p><b>How we chose 0.03 and 0.006.</b> We set both numbers by hand and did not tune them. The background is exactly 0 after preprocessing, so 0.03 sits just above it, below almost all brain tissue. 0.006 sets how sharp the switch is: \(m\) goes from 0.12 to 0.88 as brightness goes from 0.018 to 0.042. That is sharp enough to mark the outline, and smooth enough for training to learn from.</p>
+<p><b>How we chose 0.03 and 0.006.</b> By hand, without tuning. The background is exactly 0 after preprocessing, so 0.03 sits just above it and below almost all brain tissue; 0.006 makes \(m\) go from 0.12 to 0.88 between brightness 0.018 and 0.042, sharp enough to mark the outline and smooth enough to learn from.</p>
 
 <p>Then, for a generator \(G\) and its own source image \(s\):</p>
 
 \[ \begin{gathered} \mathcal{L}_{\text{sil}}(G; s) = \frac{1}{HW} \sum_{p} \Big| m\big(G(s)\big)_p - M(s)_p \Big| \\[6pt] M(s) = \begin{cases} [\,s > 0\,] & s \text{ real} \\ m(s) & s \text{ generated} \end{cases} \end{gathered} \]
 
-<p class="eq-note">In words: the fraction of pixels where the output's brain silhouette and the input's brain silhouette disagree. A real source has a perfectly black background after preprocessing, so its mask is simply "brightness above zero".</p>
+<p class="eq-note">In words: the fraction of pixels where the output's and the input's brain silhouettes disagree. A real source has a perfectly black background, so its mask is simply "brightness above zero".</p>
 
-<p>We add \(\lambda \sum \mathcal{L}_{\text{sil}}\) to SynDiff's generator loss, summed over <b>all four</b> generators. Each is compared with its own source: the two translation networks with the real T1 or T2 they were given, and the two diffusive generators' guesses \(\hat{x}_0\) with the translated images they were conditioned on. We use \(\lambda = 0.5\), chosen on validation patients (Section 4.5).</p>
+<p>We add \(\lambda \sum \mathcal{L}_{\text{sil}}\) to SynDiff's generator loss over <b>all four</b> generators, each compared with its own source (the real or translated image it was given), with \(\lambda = 0.5\) chosen on validation patients (Section 4.5). On the full data it added about 9% to training time (43.0 h vs 39.5 h on one A100).</p>
 
 <figure class="wide" id="fig6">
   <div class="diagram">
@@ -671,28 +682,22 @@ window.MathJax = {
   <figcaption><b>Figure 6.</b> The silhouette loss (our drawing; the shift is exaggerated). The input and output are each reduced to a brain mask. Where an output sits too far right, as SynDiff's T1 → T2 outputs did, the masks disagree along two thin crescents (green), and the loss is their average area. The anatomy <em>inside</em> the outline is not compared at all.</figcaption>
 </figure>
 
-<p><b>Design choices and assumptions.</b></p>
-<ul>
-  <li><b>It is legal for unpaired training.</b> Each generator is compared only with its own input, never with a real image of the other contrast.</li>
-  <li><b>It constrains only the outline.</b> The sigmoid is flat inside the brain and in the background, so the loss can pull only on pixels near the edge. It can't push a T2 to look like a T1.</li>
-  <li><b>It assumes the brain outline is the same in both contrasts.</b> That holds here, because the scans are skull-stripped and aligned to each other (Dice 1.000, Figure 2).</li>
-</ul>
-
+<p><b>Design choices and assumptions.</b> The loss is legal for unpaired training: each generator is compared only with its own input. It constrains only the outline (the sigmoid is flat inside the brain and in the background), so it can't push a T2 to look like a T1. It assumes the outline is the same in both contrasts, which holds for these skull-stripped, aligned scans (Dice 1.000, Figure 2).</p>
 <details class="ml"><summary>Details for ML readers</summary>
 <p>The loss is implemented in <code>diffusion/struct_loss.py</code> and used by <code>diffusion/syndiff_train_sc.py</code>, a copy of SynDiff's <code>train.py</code> with 32 added lines, each tagged <code># [sc]</code>. SynDiff itself is untouched. With <code>--struct_loss none</code> none of the added code runs, so training is identical to the original. Because the sigmoid is nearly flat away from 0.03, its gradient is non-zero only near the brain outline.</p>
 </details>
 
 <h3 id="scoring">3.6 How we score</h3>
 
-<p>Every model generates the same 200 test slices (20 held-out patients × 10 slices). We compare each output \(\hat{y}\) with the real T2 \(y\) <b>only inside the brain mask</b> \(B\). Three scores:</p>
+<p>Every model generates the same 200 test slices, and we compare each output \(\hat{y}\) with the real T2 \(y\) <b>only inside the brain mask</b> \(B\), using three scores:</p>
 
 <p><b>SSIM</b> (structural similarity) [17] compares local brightness, contrast and structure in a small window that slides across the image. We average the resulting map over brain pixels:</p>
 
 \[ \text{SSIM}(\hat{y}, y) = \frac{(2\mu_{\hat{y}}\mu_{y} + C_1)\,(2\sigma_{\hat{y}y} + C_2)}{(\mu_{\hat{y}}^2 + \mu_{y}^2 + C_1)\,(\sigma_{\hat{y}}^2 + \sigma_{y}^2 + C_2)} \]
 
-<p class="eq-note">In words: \(\mu\) are local averages, \(\sigma^2\) local variances and \(\sigma_{\hat{y}y}\) how the two images vary together; \(C_1, C_2\) are small constants. 1 means identical, 0 unrelated, and negative means anti-related (for example, inverted contrast).</p>
+<p class="eq-note">In words: \(\mu\) are local averages, \(\sigma^2\) local variances and \(\sigma_{\hat{y}y}\) how the two images vary together; \(C_1, C_2\) are small constants. 1 means identical, 0 unrelated, negative anti-related (for example, inverted contrast).</p>
 
-<p><b>PSNR</b> (peak signal-to-noise ratio), in decibels, from the mean squared error over brain pixels. Our images run from 0 to 1, so the "peak" is 1:</p>
+<p><b>PSNR</b> (peak signal-to-noise ratio, in decibels) comes from the mean squared error over brain pixels; our images run from 0 to 1, so the "peak" is 1:</p>
 
 \[ \begin{gathered} \text{PSNR} = 10 \log_{10} \frac{1}{\text{MSE}_B}, \\ \text{MSE}_B = \frac{1}{|B|}\sum_{p\in B} (\hat{y}_p - y_p)^2 \end{gathered} \]
 
@@ -704,13 +709,13 @@ window.MathJax = {
 
 <p class="eq-note">In words: on average, how far off is each brain pixel's brightness? Lower is better.</p>
 
-<p><b>Why only inside the brain?</b> About half of each image is black background, which every model gets right for free. Including it inflates scores and hides real differences. For example, CUT's whole-image SSIM is 0.814 (in the range papers usually report), but its brain-only SSIM is just 0.146.</p>
+<p><b>Why only inside the brain?</b> About half of each image is black background that every model gets right for free: CUT's whole-image SSIM is 0.814 (in the range papers usually report), but its brain-only SSIM is just 0.146.</p>
 
-<p><b>Is a difference real or luck?</b> Averages over 200 slices can be swayed by one unusual patient. So we average each model's scores per patient, giving 20 matched pairs, and run a <b>Wilcoxon signed-rank test</b>. It asks whether one model is better on most patients, and by more where it is better. Its output, the <b>p-value</b>, is the chance of seeing a difference at least this consistent if the two models were really equally good. A small p-value (conventionally below 0.05) means "unlikely to be luck".</p>
+<p><b>Is a difference real or luck?</b> We average each model's scores per patient (20 matched pairs) and run a <b>Wilcoxon signed-rank test</b>: is one model better on most patients, and by more where it is better? Its <b>p-value</b> is the chance of a difference at least this consistent if the two models were equally good; below 0.05 conventionally means "unlikely to be luck".</p>
 
-<p><b>Which epoch do we report?</b> Every model's headline score comes from its <b>final</b> training epoch: epoch 60 for CycleGAN and CUT, epoch 30 for SynDiff. All models are treated the same way.</p>
+<p><b>Which epoch do we report?</b> Every model's headline score comes from its <b>final</b> epoch: 60 for CycleGAN and CUT, 30 for SynDiff.</p>
 
-<p><b>Choosing our loss setting without peeking.</b> We needed to choose which extra loss to add to SynDiff and how strongly to weight it. For that we used only the 5 <em>validation</em> patients (241 slices), never the 200 test slices, with a rule written before the runs. In short: keep only settings whose outputs are not shifted, and of those, take the one with the highest validation SSIM. Applied to the epochs of the final run, the same rule would pick epoch 5, so we also report epoch 5 as a <em>secondary</em> result (Section 4.6).</p>
+<p><b>Choosing our loss setting without peeking.</b> The extra loss and its weight were chosen on the 5 <em>validation</em> patients (241 slices) only, never the 200 test slices, by a rule written before the runs (box below).</p>
 
 <details class="ml"><summary>Details for ML readers: the selection rule</summary>
 <ol>
@@ -734,17 +739,24 @@ window.MathJax = {
     <tr><td>Training slices</td><td>7,551 T1 + 7,514 T2</td><td>7,551 T1 + 7,514 T2</td><td>7,514 + 7,514</td></tr>
     <tr><td>Epochs</td><td>60 (30 + 30 with decaying learning rate)</td><td>60 (30 + 30)</td><td>30</td></tr>
     <tr><td>Learning rate</td><td>2 × 10⁻⁴</td><td>2 × 10⁻⁴</td><td>1.6 × 10⁻⁴ (G), 10⁻⁴ (D)</td></tr>
-    <tr><td>Hardware, time</td><td>1 V100 GPU, ≈20 min/epoch</td><td>1 V100 GPU, ≈17.5 min/epoch</td><td>1 A100 GPU</td></tr>
+    <tr><td>Hardware, time</td><td>1 V100 GPU, ≈20 min/epoch</td><td>1 V100 GPU, ≈17.5 min/epoch</td><td>1 A100 GPU; full data 39 h 28 min (original), 43 h 03 min (+ silhouette loss)</td></tr>
   </tbody>
 </table>
 </div>
-<p class="tcap"><b>Table 2.</b> Training setup. All runs used batch size 1, 256 × 256 grayscale slices, and Clemson's Palmetto 2 cluster.</p>
+<p class="tcap"><b>Table 2.</b> Training setup. All runs used batch size 1, 256 × 256 grayscale slices, and Clemson's Palmetto 2 cluster. CycleGAN and CUT were timed on V100 GPUs and SynDiff on A100 GPUs, so their times are not directly comparable.</p>
+<p><b>All SynDiff run times</b> (Slurm <code>sacct</code> wall-clock times, one A100, 30 epochs each; job IDs matched to runs by date and duration, as the job logs are not in the repository):</p>
+<ul>
+  <li>Original SynDiff: 500 slices 3 h 24 min (job 18689602); 2,000 slices 11 h 13 min (18689603); 7,514 slices 39 h 28 min (18689604).</li>
+  <li>+ silhouette loss: the four 500-slice sweep runs took 3 h 13 min to 3 h 25 min each (18861767–70); 2,000 slices 11 h 16 min (18937442); 7,514 slices 43 h 03 min (18937440).</li>
+  <li>On the full data that is about 76 min per pass for the original and 83 min for the silhouette version. SynDiff's <code>--num_epoch 30</code> runs epochs 0–30, i.e. 31 passes; dividing by 30 gives 79 and 86 min. The silhouette loss adds about 9% (43.0 h vs 39.5 h).</li>
+  <li>Inference: about 1 minute per job for the 200 test slices on one A100, including start-up.</li>
+</ul>
 </details>
 
 <h2 id="experiments">4. Experiments</h2>
 
 <p class="legend"><span class="m m-cut">CUT</span><span class="m m-cyc">CycleGAN</span><span class="m m-sd">SynDiff original</span><span class="m m-sda">SynDiff original, re-aligned</span><span class="m m-sil">SynDiff + silhouette loss</span></p>
-<p>These colours are used for each model in every chart below.</p>
+<p>These colours mark each model in every chart below.</p>
 
 <h3 id="exp1">4.1 Experiment 1: Is CUT better than CycleGAN?</h3>
 
@@ -753,7 +765,7 @@ window.MathJax = {
   <dt>Purpose</dt><dd>Test our proposal's hypothesis that CUT's patch matching keeps fine anatomy better.</dd>
 </dl>
 
-<p>It was not close, and it went the other way. <span class="m m-cyc">CycleGAN</span> scored brain SSIM 0.512, PSNR 15.90 dB, MAE 0.129. <span class="m m-cut">CUT</span> scored 0.146, 13.17 dB and 0.171. CycleGAN wins on every metric, and the gap is largest on SSIM, the score most sensitive to structure.</p>
+<p>It went the other way, by a wide margin. <span class="m m-cyc">CycleGAN</span> scored brain SSIM 0.512, PSNR 15.90 dB, MAE 0.129; <span class="m m-cut">CUT</span> scored 0.146, 13.17 dB and 0.171. CycleGAN wins on every metric, most of all on SSIM, the score most sensitive to structure.</p>
 
 <figure class="wide mfig" id="fig7">
   <div class="mgrid c6"><div class="mhead">Input T1</div><div class="mhead"><span class="m m-cut">CUT</span></div><div class="mhead"><span class="m m-cyc">CycleGAN</span></div><div class="mhead">Real T2</div><div class="mhead"><span class="m m-cut">CUT error</span></div><div class="mhead"><span class="m m-cyc">CycleGAN error</span></div>
@@ -765,9 +777,9 @@ window.MathJax = {
   <figcaption><b>Figure 7.</b> Four test slices, cropped from our original comparison figure (A: <code>BraTS2021_00271_s084</code>, B: <code>_01648_s074</code>, C: <code>_01509_s117</code>, D: <code>_01163_s094</code>). Columns: input T1, the synthetic T2 from <span class="m m-cut">CUT</span> and <span class="m m-cyc">CycleGAN</span>, the real T2, then each model's error inside the brain on the colour bar above, with that slice's MAE. Look at the error maps: CUT's errors trace the cortical folds, while CycleGAN's are mostly faint. In row D, CycleGAN makes the tumour much brighter than in the real T2, a reminder that it fails too.</figcaption>
 </figure>
 
-<p><b>Is CUT just misaligned?</b> A score this low could come from an output that is correct but slightly displaced. Our <code>shift_check.py</code> slides each output a couple of pixels in every direction and re-scores it. CycleGAN scores best exactly where it is, at (0, 0). CUT has no peak at all, and its unshifted position actually scores lowest. That pattern means its fine structure is partly <em>reversed</em>, not displaced.</p>
+<p><b>Is CUT just misaligned?</b> <code>shift_check.py</code> slides each output a couple of pixels in every direction and re-scores it. CycleGAN scores best exactly where it is, at (0, 0). CUT has no peak, and its unshifted position scores lowest, so its fine structure is partly <em>reversed</em>, not displaced.</p>
 
-<p><b>The polarity test.</b> To check this, <code>polarity_check.py</code> keeps only the fine detail of each image: the image minus a blurred copy of itself (a Gaussian blur of 2 pixels). It then measures, inside the brain, how that fine detail correlates (from −1 to +1) with the input T1 and with the real T2.</p>
+<p><b>The polarity test.</b> <code>polarity_check.py</code> keeps each image's fine detail (the image minus a 2-pixel Gaussian blur of itself) and measures, inside the brain, how it correlates (−1 to +1) with the input T1 and with the real T2.</p>
 
 <div class="table-wrap">
 <table>
@@ -791,18 +803,18 @@ window.MathJax = {
   <figcaption><b>Figure 8.</b> A zoomed crop of the folds on test slice <code>BraTS2021_00271_s084</code>. In the real T2, the white-matter "fingers" are dark with lighter tissue around them, the reverse of the T1. CycleGAN reproduces that pattern; CUT's version is flatter, with bright streaks where the T1 had them. The difference is easier to measure (Table 3) than to see.</figcaption>
 </figure>
 
-<p>Two more observations from this experiment shaped everything after it. First, <b>brain-only scoring matters</b>: whole-image SSIM is 0.814 for CUT and 0.888 for CycleGAN, a gap that looks small, versus 0.146 and 0.512 inside the brain. Second, <b>patients differ in brightness</b>. After normalisation, the median brain brightness of the real T2s ranges from 0.18 to 0.66 across test patients, while every model produces a fairly constant "typical" level. Part of every model's error is this mismatch rather than wrong anatomy. It affects all models alike, so the comparison stays fair.</p>
+<p>Two more observations shaped everything after. <b>Brain-only scoring matters</b>: whole-image SSIM is 0.814 for CUT and 0.888 for CycleGAN, a small-looking gap, versus 0.146 and 0.512 inside the brain. <b>Patients differ in brightness</b>: after normalisation, the real T2s' median brain brightness ranges from 0.18 to 0.66, while every model outputs a fairly constant level. That mismatch is part of every model's error, so the comparison stays fair.</p>
 
-<div class="learned"><strong>What we learned</strong>Our hypothesis was backwards. CUT's contrastive loss rewards output patches that stay recognisably similar to their input patches. That is a sensible goal for horses → zebras, but T1 → T2 requires the fine light/dark pattern to <em>flip</em>. A plausible explanation is that PatchNCE resists that flip. (Caveat: one training run per model, default settings.)</div>
+<div class="learned"><strong>What we learned</strong>Our hypothesis was backwards. CUT's contrastive loss rewards output patches that stay recognisably similar to their input patches: sensible for horses → zebras, but T1 → T2 needs the fine light/dark pattern to <em>flip</em>, and PatchNCE plausibly resists that. (Caveat: one training run per model, default settings.)</div>
 
-<h3 id="exp2">4.2 Experiment 2: SynDiff out of the box: beautiful, and the worst score</h3>
+<h3 id="exp2">4.2 Experiment 2: SynDiff out of the box: realistic-looking, and the worst score</h3>
 
 <dl class="exp-meta">
   <dt>What we did</dt><dd>Trained the official SynDiff on all 7,514 slices per contrast for 30 epochs and generated the 200 test slices.</dd>
   <dt>Purpose</dt><dd>See whether a modern diffusion model beats the best GAN.</dd>
 </dl>
 
-<p>The pictures were the best we had seen: sharp folds, convincing T2 contrast, realistic texture. The score was the worst we had seen. <span class="m m-sd">SynDiff original</span> scored brain SSIM <b>0.105</b>, PSNR 12.04 dB, MAE 0.190, below even CUT.</p>
+<p>By eye, the pictures looked the most realistic of all our models: sharp folds, convincing T2 contrast, realistic texture. That is only an impression: we did not measure realism (no FID score, no blind reading by radiologists). The score was the worst we had seen: <span class="m m-sd">SynDiff original</span> scored brain SSIM <b>0.105</b>, PSNR 12.04 dB, MAE 0.190, below even CUT.</p>
 
 <figure class="wide" id="fig9">
   <a class="zoom" href="assets/closeup-00271.png"><img src="assets/closeup-00271.png" width="1600" height="713" loading="lazy" alt="Close-up of one tumour slice: input T1, outputs of CUT, CycleGAN, SynDiff original, SynDiff plus silhouette loss, real T2; below, error maps. SynDiff original looks realistic but its error map has bright bands along edges."></a>
@@ -823,11 +835,19 @@ window.MathJax = {
   <figcaption><b>Figure 10.</b> Brain SSIM of the T1 → T2 diffusive generator's outputs when moved by (dy, dx) pixels, on 50 test slices at epoch 30 of the full-data run. Bright = good match; +dy moves the output down, +dx moves it right. <b>Left</b> (<span class="m m-sd">original</span>): the bright spot (circle) is far from the centre (+). The best match comes from moving the output 2 pixels down and 8 pixels left, a correction of (dy, dx) = (+2, −8), where SSIM jumps from 0.088 to 0.519. <b>Right</b> (<span class="m m-sil">with the silhouette loss</span>, Section 4.5): the peak is exactly at the centre (0.548).</figcaption>
 </figure>
 
-<p>That was the culprit. The <span class="m m-sd">original</span> SynDiff's anatomy was largely right; it was drawn in the wrong place, about 8 pixels too far right and 2 pixels too high. Moving the outputs back, a correction of (dy, dx) = (+2, −8) pixels, raises SSIM on those slices from <b>0.088 to 0.519</b>. On a 256-pixel image, 8 pixels is a small displacement, invisible at a glance, but it ruins every pixel-by-pixel comparison, because folds and ventricles land on top of the wrong tissue.</p>
+<p>That was the culprit: the anatomy was largely right but drawn in the wrong place. Over the 50 scored slices, the single shift that best lines the outputs up with the real T2 is (dy, dx) = (+2, −8), 2 pixels down and 8 left; so, as a whole, the outputs sat about 8 pixels too far right and 2 too high, and correcting that raises SSIM on those slices from <b>0.088 to 0.519</b>. The shift was consistent from slice to slice (box below). Small as it is, it puts folds and ventricles on the wrong tissue.</p>
 
-<p><b>A legitimate quick fix.</b> We cannot use the real T2 to fix outputs at test time; that would be cheating. But we can use the <em>input</em>. Our <code>align_to_input.py</code> finds, for each output, the whole-pixel shift (within ±16 pixels) that best overlaps the output's brain silhouette with the input T1's silhouette, measured by Dice, and applies it. It never looks at the real T2. With this test-time re-alignment, <span class="m m-sda">SynDiff original, re-aligned</span> scores <b>0.507</b>, close to CycleGAN's 0.512. We ran the same re-alignment on CycleGAN and CUT as a check: it found nothing to correct, and their scores did not change (0.512 and 0.146). The shift is SynDiff's alone.</p>
+<p><b>A legitimate quick fix.</b> We can't use the real T2 at test time, but we can use the <em>input</em>: <code>align_to_input.py</code> shifts each output (within ±16 pixels) so its brain silhouette best overlaps the input T1's, measured by Dice. Re-aligned, <span class="m m-sda">SynDiff original</span> scores <b>0.507</b>, close to CycleGAN's 0.512. On CycleGAN and CUT it found nothing to correct (scores unchanged at 0.512 and 0.146): the shift is SynDiff's alone.</p>
 
-<p><b>The shift is not a constant.</b> We scored every saved checkpoint on the validation patients, estimating the needed correction from the input alone. It drifted during training and varied between runs. In the full-data run the correction was (+1, −7) at epoch 5 and settled at (+2, −8) from epoch 15. In the 500-slice run the horizontal correction grew from −1 to −5 pixels. The 2,000-slice run happened to stay within 1 pixel of centre the whole time.</p>
+<p><b>The shift is not a constant.</b> Scored at every saved checkpoint on the validation patients, it drifted during training and varied between runs (Figure 11; numbers in the box).</p>
+
+<details class="ml"><summary>Details for ML readers: how consistent and how stable the shift was</summary>
+<ul>
+  <li>Slice to slice: on the validation patients (full-data run), the typical (median) slice needed the same (+2, −8) correction as the overall best shift, and not one slice was within 1 pixel of correct.</li>
+  <li>Over training: in the full-data run the correction was (+1, −7) at epoch 5 and settled at (+2, −8) from epoch 15. In the 500-slice run the horizontal correction grew from −1 to −5 pixels. The 2,000-slice run stayed within 1 pixel of centre throughout.</li>
+  <li>These validation corrections are estimated from the input alone (<code>align_to_input.py</code>), never from the real T2.</li>
+</ul>
+</details>
 
 <figure class="wide" id="fig11">
   <a class="zoom" href="assets/shift-drift-n500.png"><img src="assets/shift-drift-n500.png" width="1600" height="637" loading="lazy" alt="Left: median horizontal shift by epoch for the 500-slice runs; the original drifts from −1 to −5 pixels, the silhouette-loss run stays at 0. Right: validation SSIM by epoch; silhouette loss rises to 0.44, the original stays near 0.12 to 0.15 raw and reaches 0.29 after alignment."></a>
@@ -843,10 +863,10 @@ window.MathJax = {
   <dt>Purpose</dt><dd>Find the cause, so the fix can target it.</dd>
 </dl>
 
-<p><b>The hypothesis.</b> Look at SynDiff's losses again and ask which one cares <em>where</em> the anatomy is:</p>
+<p><b>The hypothesis.</b> Which of SynDiff's losses cares <em>where</em> the anatomy is?</p>
 <ul>
-  <li>The <b>adversarial losses</b> judge realism, not position. The translation networks' discriminators are PatchGANs, which score local patches. The diffusion discriminators give one score per image, but they add up what they see over every position first, so they have little reason to notice where the brain sits. A brain moved 8 pixels still looks like a real brain.</li>
-  <li>The <b>cycle loss</b> only asks that the two translation networks undo each other. If the T1 → T2 network moves everything 8 pixels right and the T2 → T1 network moves everything 8 pixels left, the round trip is perfect and the loss is happy.</li>
+  <li>The <b>adversarial losses</b> judge realism, not position: the translation networks' PatchGANs score local patches, and the diffusion detectives add up what they see over every position. A brain moved 8 pixels still looks like a real brain.</li>
+  <li>The <b>cycle loss</b> only asks the two translation networks to undo each other: if T1 → T2 moves everything 8 pixels right and T2 → T1 moves it 8 left, the round trip is perfect.</li>
 </ul>
 
 <figure class="wide" id="fig12">
@@ -896,49 +916,52 @@ window.MathJax = {
     <text x="662" y="330" font-size="15" font-weight="700" fill="#b03a00">place</text>
   </svg>
   </div>
-  <figcaption><b>Figure 12.</b> Our hypothesis as a cartoon (our drawing; the real T1 → T2 displacement is 8 pixels right and 2 up, exaggerated and simplified here). <b>Top:</b> equal and opposite shifts cancel on the round trip, so the cycle loss cannot see them. <b>Bottom:</b> at test time nothing cancels the shift. The synthetic T2's outline (orange) misses the real T2's outline (blue).</figcaption>
+  <figcaption><b>Figure 12.</b> Our hypothesis as a cartoon (our drawing; the measured T1 → T2 shift is about 8 pixels right and 2 up overall, exaggerated and simplified here). <b>Top:</b> equal and opposite shifts cancel on the round trip, so the cycle loss cannot see them. <b>Bottom:</b> at test time nothing cancels the shift. The synthetic T2's outline (orange) misses the real T2's outline (blue).</figcaption>
 </figure>
 
-<p>But the image we actually score comes from the <em>diffusive</em> generator, not the translation network. Here is the link. Recall Figure 5: the T1 → T2 diffusive generator is trained to turn \(F(y)\), a fake T1 made from a real T2 \(y\), back into \(y\). If \(F\) shifts by \(-s\), then every training source is shifted by \(-s\) relative to its target, and the diffusive generator dutifully learns to <em>apply</em> \(+s\). At test time it receives a real, unshifted T1 and still applies \(+s\). Nothing in the training prefers one value of \(s\) over another, which would also explain why it differs from run to run.</p>
+<p>The image we score, though, comes from the <em>diffusive</em> generator, trained (Figure 5) to turn \(F(y)\), a fake T1 made from a real T2 \(y\), back into \(y\). If \(F\) shifts by \(-s\), every training source is off by \(-s\), so the diffusive generator learns to <em>apply</em> \(+s\), and applies it at test time to a real, unshifted T1. Nothing prefers one value of \(s\), which would also explain why it differs between runs.</p>
 
-<p><b>The prediction.</b> If this is right, <em>all four</em> generators are shifted: both T1 → T2 generators by \(+s\), both T2 → T1 generators by \(-s\). If instead only the diffusive generators were shifted, the shift would be born in diffusion training, not in the cycle.</p>
+<p><b>The prediction.</b> If so, <em>all four</em> generators are shifted: both T1 → T2 generators by \(+s\), both T2 → T1 generators by \(-s\). If only the diffusive ones were, the shift would come from diffusion training instead.</p>
 
-<p><b>The test.</b> <code>syndiff_shift_cause.sbatch</code> runs all four generators of the epoch-30 checkpoint on 50 test slices. It measures each one's shift against the real image of the contrast it produces, so the T2 → T1 generators are compared with the real T1.</p>
+<p><b>The test.</b> <code>syndiff_shift_cause.sbatch</code> measures the shift of all four generators of the epoch-30 checkpoint on 50 test slices, each against the real image of the contrast it produces.</p>
 
 <figure class="wide" id="fig13">
   <a class="zoom" href="assets/generator-shifts.png"><img src="assets/generator-shifts.png" width="1600" height="688" loading="lazy" alt="Table-like figure of best alignment shift for four generators. Original: both T1 to T2 generators (+2, −8), both T2 to T1 generators (−2, +8). With the silhouette loss: all four (0, 0)."></a>
   <figcaption><b>Figure 13.</b> The correction (dy, dx) that best lines up each of SynDiff's four generators with the real image (full data, epoch 30, 50 test slices). <b>Middle column</b> (<span class="m m-sd">original</span>): both T1 → T2 generators need (+2, −8), and both T2 → T1 generators need exactly the opposite, (−2, +8). Moving their outputs back raises SSIM from 0.07–0.10 to 0.42–0.54. <b>Right column</b> (<span class="m m-sil">with the silhouette loss</span>): all four sit at (0, 0).</figcaption>
 </figure>
 
-<div class="learned"><strong>What we learned</strong>The prediction held exactly. The shift is born in the cycle, where equal and opposite shifts cancel, and the diffusive generators inherit it through the pairs the cycle manufactures. An open question remains: CycleGAN also uses a cycle loss but showed no shift, and our account does not explain why.</div>
+<p><b>Why didn't CycleGAN and CUT shift? A hypothesis we have not tested.</b> CycleGAN has an <em>identity loss</em> (on by default and in our run): a real T2 fed to the T1 → T2 generator must come out unchanged, so moving everything a few pixels would cost it on every training step. CUT's identity term (on by default in "CUT" mode) does the same with patch matching, and its main patch-matching loss compares each output patch with the input patch at the same location. SynDiff's generator loss has no identity term. This would explain the pattern, but it is only a hypothesis; Section 5 lists the test.</p>
+
+<div class="learned"><strong>What we learned</strong>The prediction held exactly: the shift is born in the cycle, where equal and opposite shifts cancel, and the diffusive generators inherit it through the pairs the cycle manufactures. Why CycleGAN, which also has a cycle loss, did not shift is still open; our best guess is its identity loss (above).</div>
 
 <h3 id="exp5">4.5 Experiment 5: Choosing a fix, on validation patients only</h3>
 
 <dl class="exp-meta">
-  <dt>What we did</dt><dd>Added a position-preserving loss to all four generators. We tried two kinds (silhouette, MIND) at two weights each, trained on 500 slices for 30 epochs, scored every 5th epoch on the 241 validation slices, and applied the rule from Section 3.6. Then we confirmed on 2,000 slices and on all the data.</dd>
+  <dt>What we did</dt><dd>Added a position-preserving loss to all four generators: silhouette or MIND, at two weights each, trained on 500 slices for 30 epochs and chosen on the 241 validation slices by the rule in Section 3.6; then confirmed on 2,000 slices and all the data.</dd>
   <dt>Purpose</dt><dd>Remove the shift <em>in training</em>, so no post-processing is needed, and pick the loss without touching the test set.</dd>
 </dl>
 
-<p>We tested on 500 slices because each run is cheap and because the 500-slice baseline had drifted (Figure 11), so a fix had something to remove. The two candidates were each tried at two strengths. The weight \(\lambda\) sets how much the extra loss counts compared with SynDiff's own losses:</p>
+<p>We started at 500 slices: runs are cheap there, and that baseline had drifted (Figure 11), so a fix had something to remove. \(\lambda\) sets how much the extra loss counts against SynDiff's own:</p>
 <ul>
   <li><b>Silhouette</b> (Section 3.5) at \(\lambda = 0.5\) and \(\lambda = 2\).</li>
   <li><b>MIND</b> (Section 2.8), which compares the layout around every pixel rather than just the outline, at \(\lambda = 0.25\) and \(\lambda = 1\).</li>
 </ul>
 
 <details class="ml"><summary>Details for ML readers: why these weights</summary>
-<p>Silhouette: an L1 term like SynDiff's own, so it starts at SynDiff's L1 weight (<code>--lambda_l1_loss 0.5</code>), with 2 as the stronger option. MIND: the two papers that add a MIND loss to an unpaired cycle model weight it at half the cycle weight (Yang et al. [13]: \(\lambda_{\text{cycle}} = 10\), \(\lambda_{\text{structure}} = 5\)). SynDiff's cycle weight is 0.5, so the same ratio gives 0.25; we also tried 1. MIND uses a 9 × 9 search region, 7 × 7 Gaussian patches with \(\sigma = 2\), and 4-neighbourhood variance. All runs: 500 slices per contrast, 30 epochs, seed 1024.</p>
+<p>Silhouette: an L1 term like SynDiff's own, so it starts at SynDiff's L1 weight (<code>--lambda_l1_loss 0.5</code>), with 2 as the stronger option. MIND: Yang et al. [13], who add a MIND loss to an unpaired CycleGAN, weight it at half the cycle weight (\(\lambda_{\text{cycle}} = 10\), \(\lambda_{\text{structure}} = 5\)). SynDiff's cycle weight is 0.5, so the same ratio gives 0.25; we also tried 1. MIND uses a 9 × 9 search region, 7 × 7 Gaussian patches with \(\sigma = 2\), and 4-neighbourhood variance. All runs: 500 slices per contrast, 30 epochs, seed 1024.</p>
 </details>
 
 <figure class="wide" id="fig14">
   <a class="zoom" href="assets/loss-sweep.png"><img src="assets/loss-sweep.png" width="1600" height="842" loading="lazy" alt="Bar chart of best raw validation SSIM: baseline 0.148, silhouette 0.5 0.440, silhouette 2 0.419, MIND 0.25 −0.059, MIND 1 −0.066; dashed line at 0.290 for the baseline after alignment."></a>
-  <figcaption><b>Figure 14.</b> The best raw validation SSIM of each 500-slice run (epoch ≥ 1), with the dashed line at the original's best score after re-alignment (0.290, the quality floor). Both <span class="m m-sil">silhouette</span> weights clear the floor, and \(\lambda = 0.5\) is best (0.440). Both MIND runs remove the shift but score below zero: they broke the translation.</figcaption>
+  <figcaption><b>Figure 14.</b> The best raw validation SSIM of each 500-slice run (epoch ≥ 1), with the dashed line at the original's best score after re-alignment (0.290). Both <span class="m m-sil">silhouette</span> weights beat it, and \(\lambda = 0.5\) is best (0.440). Both MIND runs remove the shift but score below zero: they broke the translation.</figcaption>
 </figure>
 
-<p>The silhouette loss removed the shift at every epoch from 5 on, at both weights, and \(\lambda = 0.5\) was higher than \(\lambda = 2\) at every epoch from 15 on (0.440 vs 0.42 at epoch 30). MIND also removed the shift, but its validation SSIM was negative at every epoch (−0.06 to −0.14), about the level of handing in the T1 unchanged. We did not investigate why MIND fails here; the rule simply excludes it.</p>
+<p>The silhouette loss removed the shift at every epoch from 5 on, at both weights, with \(\lambda = 0.5\) ahead of \(\lambda = 2\) from epoch 15 on (0.440 vs 0.42 at epoch 30). MIND also removed the shift but broke the translation: validation SSIM stayed negative (−0.06 to −0.14), about the level of handing in the T1 unchanged. We did not investigate why; the rule excludes it.</p>
 
-<p><b>Scaling up.</b> On 2,000 slices, the original run happened to be unshifted, yet the silhouette loss still raised the best validation SSIM from 0.542 to 0.580 (both at epoch 10). On all the data, the fixed run is unshifted at every saved epoch. At every epoch its <em>raw</em> validation SSIM (0.568–0.585) beats the original's score <em>after re-alignment</em> (0.525–0.551).</p>
+<p><b>Scaling up.</b> On 2,000 slices the original run happened to be unshifted, yet the silhouette loss still raised the best validation SSIM from 0.542 to 0.580 (both at epoch 10). On all the data, the fixed run is unshifted at every saved epoch and scores higher than the original even after re-alignment.</p>
 
 <details class="ml"><summary>Details for ML readers: epoch-by-epoch validation scores (Table 4)</summary>
+<p>At every saved epoch of the full-data runs, the fixed model's <em>raw</em> validation SSIM (0.568–0.585) beats the original's score <em>after re-alignment</em> (0.525–0.551). The rule's quality floor for this data size is the original's best re-aligned score, 0.551 (epoch 15).</p>
 <div class="table-wrap">
 <table>
   <thead><tr><th class="num">Epoch</th><th class="num"><span class="m m-sd">Original</span> raw</th><th>Original correction (dy, dx)</th><th class="num"><span class="m m-sda">Original</span> re-aligned</th><th class="num"><span class="m m-sil">+ silhouette</span> raw</th></tr></thead>
@@ -955,9 +978,9 @@ window.MathJax = {
 <p class="tcap"><b>Table 4.</b> Full-data runs, brain SSIM on the 241 validation slices (<code>results/syndiff_val/val_results.csv</code>). The fixed run needs no correction, (0, 0), at every epoch. If the selection rule is also used to pick an epoch, epochs 5 and 15 tie at 0.585 (within 0.005) and the lower MAE (0.1145 vs 0.1178) picks epoch 5; Section 4.6 reports it as a secondary result.</p>
 </details>
 
-<p>And the four-generator test from Experiment 4, repeated on the fixed model, puts all four generators at (0, 0) (Figure 13, right column; Figure 10, right panel).</p>
+<p>Repeated on the fixed model, the four-generator test from Experiment 4 puts all four generators at (0, 0) (Figure 13, right column; Figure 10, right panel).</p>
 
-<div class="learned"><strong>What we learned</strong>Constraining only the outline was enough to stop the cycle from cheating, and it did not get in the way of learning the anatomy inside. The fixed model scores higher raw than the original does even after re-alignment. That suggests the shift was not just a cosmetic offset: training goes better when the cycle can't cheat. Constraining the inside structure as well (MIND) backfired.</div>
+<div class="learned"><strong>What we learned</strong>Constraining only the outline stopped the cycle from cheating without hurting the anatomy inside. That the fixed model beats even the re-aligned original suggests the shift was not just cosmetic: training goes better when the cycle can't cheat. Constraining the inside structure as well (MIND) backfired.</div>
 
 <h3 id="exp6">4.6 Experiment 6: The final comparison</h3>
 
@@ -966,7 +989,7 @@ window.MathJax = {
   <dt>Purpose</dt><dd>The headline comparison, plus a check that any gain is consistent across patients.</dd>
 </dl>
 
-<p><b>Which epoch?</b> As for every model, the headline is the <b>final epoch</b>: epoch 30 for our model. The validation patients would have picked epoch 5, which scores 0.566 / 16.43 dB / 0.121 on the test slices. We report it as a secondary result, not a competing headline. Both come from the same training run, both beat CycleGAN on SSIM, and neither choice used test numbers. The fixed model scores within a narrow band at every validation epoch (0.568–0.585), so the conclusion does not depend on which epoch we pick.</p>
+<p><b>Which epoch?</b> As for every model, the headline is the <b>final epoch</b>, 30. The validation patients would have picked epoch 5 (test scores 0.566 / 16.43 dB / 0.121), which we report as secondary. Both come from the same run, both beat CycleGAN on SSIM, and neither choice used test numbers, so the conclusion does not depend on the choice.</p>
 
 <div class="table-wrap wide">
 <table>
@@ -988,7 +1011,7 @@ window.MathJax = {
   <figcaption><b>Figure 15.</b> The same numbers as bars, with error bars showing 95% confidence intervals over the 20 patient means. Look at the two SynDiff extremes: the vermillion bar (0.105) and the green bar (0.543) come from the same architecture; the only difference is the silhouette loss during training.</figcaption>
 </figure>
 
-<p>Averages can hide a lot, so let's look closer. The slider below shows one test slice, <code>BraTS2021_00359_s082</code>, with large fluid-filled ventricles in the middle. Drag it to compare the two SynDiff models' error maps.</p>
+<p>Averages hide a lot. Drag the slider to compare the two SynDiff models' error maps on test slice <code>BraTS2021_00359_s082</code>, which has large fluid-filled ventricles.</p>
 
 <figure class="wide" id="fig16">
   <div class="slider-grid">
@@ -1015,7 +1038,7 @@ window.MathJax = {
   <figcaption><b>Figure 16 (interactive).</b> Absolute error inside the brain for test slice <code>BraTS2021_00359_s082</code>, cropped, on one colour scale (dark = small error). Left of the line: <span class="m m-sd">SynDiff original</span>. Right: <span class="m m-sil">SynDiff + silhouette loss</span>. Look at the ventricles: the original's error shows them twice, as bright parallel bands, because its ventricles sit beside the real ones. There is also a bright rim along one side of the brain. With the silhouette loss both disappear, and this slice's SSIM rises from 0.04 to 0.71 (CycleGAN: 0.72).</figcaption>
 </figure>
 
-<p><b>Is the gain over CycleGAN real?</b> CycleGAN is the strongest other model, so we compared it with SynDiff + silhouette loss patient by patient:</p>
+<p><b>Is the gain over CycleGAN real?</b> CycleGAN is the strongest other model, so we compared the two patient by patient:</p>
 
 <figure id="fig17">
   <a class="zoom" href="assets/per-patient.png"><img src="assets/per-patient.png" width="1600" height="1450" loading="lazy" alt="Slope chart of patient-mean brain SSIM, CycleGAN on the left and SynDiff plus silhouette loss on the right, one line per patient; 17 lines go up, 3 go down; means 0.512 and 0.543."></a>
@@ -1048,8 +1071,9 @@ window.MathJax = {
   <figcaption><b>Figure 18.</b> Four test slices, all models, cropped from our original comparison figure (A: <code>BraTS2021_01598_s027</code>, B: <code>_01143_s121</code>, C: <code>_01648_s074</code>, D: <code>_01163_s094</code>). Top row of each slice: input T1, the synthetic T2 from each model, and the real T2. Bottom row: each model's error inside the brain, directly under its output, with that slice's MAE. Look at row B: the real T2 is unusually dark and <em>every</em> model is too bright. That is the patient-brightness problem from Experiment 1, and no model solves it. Also compare the two SynDiff error columns: the original's maps light up along edges (its shift), the silhouette-loss maps much less.</figcaption>
 </figure>
 
-<h4 id="paper-compare">How do our numbers compare with the SynDiff paper?</h4>
+<p><b>How do our numbers compare with the SynDiff paper?</b> Ours are lower mainly because we score only inside the brain. Scored over the whole image, as the paper appears to, our SSIM is within about 3 points of theirs (box below).</p>
 
+<details class="ml wide" id="paper-compare"><summary>Details for ML readers: comparison with the SynDiff paper (Table 7)</summary>
 <p>Our SynDiff scores look much lower than the ones in the SynDiff paper, so it is fair to ask whether our setup is broken. Table 7 puts the paper's BraTS T1 → T2 results [10, Table III of the arXiv version] next to ours. The paper reports SSIM as a percentage, so we do the same here.</p>
 
 <div class="table-wrap wide" id="table7">
@@ -1075,8 +1099,9 @@ window.MathJax = {
   <li><b>Different slices and patients.</b> They take 100 brain-containing slices per subject from 55 patients of an earlier BraTS release (25 for training). We use slices with at least 40% of the largest brain area, every second one, from 160 + 160 training patients of BraTS 2021. Their SynDiff trained for 50 epochs; ours for 30.</li>
 </ul>
 <p>The pattern also matches. In both studies, SynDiff (in our case, with the silhouette loss) is slightly ahead of the cycle-consistent GAN. The unfixed SynDiff is the odd one out, and its whole-image score (77.3%) is where the shift shows.</p>
+</details>
 
-<div class="learned"><strong>What we learned</strong>With the silhouette loss, SynDiff needs no post-processing. It has the best SSIM in our single-run comparison, and the best average PSNR and MAE, though those two differences are not significant. The SSIM gain over CycleGAN is consistent (17 of 20 patients, p = 0.00017). The PSNR and MAE gains are small and <em>not</em> statistically significant (12 of 20 patients each, p = 0.28 and 0.29), so on intensity error the two models are about level. Our claim is the structural (SSIM) one.</div>
+<div class="learned"><strong>What we learned</strong>With the silhouette loss, SynDiff needs no post-processing and has the best SSIM in our single-run comparison. The SSIM gain over CycleGAN is consistent (17 of 20 patients, p = 0.00017). Its average PSNR and MAE are also slightly better, but <em>not</em> significantly (12 of 20 patients each, p = 0.28 and 0.29), so on intensity error the two models are about level. Our claim is the structural (SSIM) one.</div>
 
 <h3 id="exp7">4.7 Experiment 7: Does the amount of data matter?</h3>
 
@@ -1090,12 +1115,12 @@ window.MathJax = {
   <figcaption><b>Figure 19.</b> Test brain SSIM against training-set size. Pink: <span class="m m-sda">original, re-aligned</span>; green: <span class="m m-sil">with the silhouette loss</span>; dashed blue: CycleGAN trained on all data (0.512). The green line is above the pink one at every size, by the most at 500 slices (0.433 vs 0.296), and only the fixed model trained on all the data passes CycleGAN.</figcaption>
 </figure>
 
-<div class="learned"><strong>What we learned</strong>More data helps both versions, and the fix helps at every size, most when data is scarce: +0.137 SSIM at 500 slices, +0.014 at 2,000, +0.036 at 7,514. Even the original's best case (re-aligned) never reaches CycleGAN.</div>
+<div class="learned"><strong>What we learned</strong>More data helps both versions, and the fix helps at every size, most when data is scarce: +0.137 SSIM at 500 slices, +0.014 at 2,000, +0.036 at 7,514. Even the original's best case (re-aligned) never reaches CycleGAN. Only SynDiff was trained at 500 and 2,000 slices (CycleGAN and CUT used all the data), so we can't say how the GANs scale.</div>
 
 <h2 id="conclusions">5. Conclusions</h2>
 
 <h3>Main idea and results</h3>
-<p>We compared three unpaired methods for turning T1 brain MRI into T2 under identical conditions, scoring only inside the brain. Two lessons stand out. First, the GAN that ties output most tightly to input (CUT) did much worse than CycleGAN. For T1 → T2, "keep the input's local pattern" is partly the wrong goal, because the fine contrast must flip. Second, a strong diffusion model (SynDiff) can produce beautiful images that are systematically misplaced. Its two translation directions learned equal and opposite shifts that cancel on the round trip, and its diffusion generators inherited the shift. A small silhouette loss, chosen on validation patients only, removed the shift from all four generators. It turned SynDiff from the lowest score (brain SSIM 0.105) into the best SSIM in our single-run comparison (0.543), better than CycleGAN on 17 of 20 patients (p = 0.00017), with PSNR and MAE about level.</p>
+<p>We compared three unpaired methods for turning T1 brain MRI into T2 under identical conditions, scoring only inside the brain. Two lessons stand out. First, the GAN that ties output most tightly to input (CUT) did much worse than CycleGAN. For T1 → T2, "keep the input's local pattern" is partly the wrong goal, because the fine contrast must flip. Second, a strong diffusion model (SynDiff) can produce images that look realistic by eye (we did not measure realism) yet are systematically misplaced. Its two translation directions learned equal and opposite shifts that cancel on the round trip, and its diffusion generators inherited the shift. A small silhouette loss, chosen on validation patients only, removed the shift from all four generators. It turned SynDiff from the lowest score (brain SSIM 0.105) into the best SSIM in our single-run comparison (0.543), better than CycleGAN on 17 of 20 patients (p = 0.00017), with PSNR and MAE about level.</p>
 
 <p>The broader takeaway: <b>looking right is not being right</b>. Realism-based losses and whole-image metrics both missed an 8-pixel error that brain-only, per-patient scoring exposed immediately.</p>
 
@@ -1107,6 +1132,7 @@ window.MathJax = {
   <li><b>CycleGAN and CUT used default settings.</b> They were not heavily tuned, so "CUT did much worse than CycleGAN" describes CUT at its defaults on this task.</li>
   <li><b>Modest test set.</b> We score a fixed subset of 20 of the 80 held-out patients (200 slices), fixed before any results so that every run is scored on the same slices. Only the SSIM difference with CycleGAN is statistically significant.</li>
   <li><b>Hand-set silhouette constants.</b> The threshold (0.03) and sharpness (0.006) were set by hand, not tuned.</li>
+  <li><b>No tumour-region score.</b> All our scores average over the whole brain. We did not score the tumour region separately, so we can't say how faithfully each model reproduces the tumour itself.</li>
   <li><b>No clinical evaluation.</b> Our scores measure agreement with the real T2, not whether a radiologist would reach the same diagnosis.</li>
 </ul>
 
@@ -1118,15 +1144,17 @@ window.MathJax = {
   <li><b>A downstream test:</b> train a tumour-segmentation model and compare its accuracy on real vs synthetic T2.</li>
   <li><b>A paired upper bound</b> with Pix2Pix [3], using the pairs we hid.</li>
   <li><b>Unpaired diffusion baselines</b> such as SDEdit [8] and DDIB [9].</li>
-  <li><b>Open questions:</b> why CycleGAN, which also has a cycle loss, did not drift, and why the MIND loss broke the translation.</li>
+  <li><b>Test the identity-loss hypothesis</b> (Section 4.4): train CycleGAN without its identity loss and check whether a shift appears.</li>
+  <li><b>Tumour-region MAE</b>, using the tumour masks that come with BraTS, to score the part of the image that matters most clinically.</li>
+  <li><b>Open question:</b> why the MIND loss broke the translation.</li>
 </ul>
 
 <h2 id="reproduce">Reproduce our results</h2>
 
 <p>Everything is in the <a href="https://github.com/aditya684git/mri-t1-t2-translation">code repository</a> (no data or model weights). In brief:</p>
 <ol>
-  <li><b>Data:</b> request BraTS 2021 Task 1 from the official source (<a href="https://www.synapse.org/Synapse:syn25829067">Synapse</a>) and accept its terms. We used the same training set from the <a href="https://www.kaggle.com/datasets/dschettler8845/brats-2021-task1">Kaggle mirror</a>. Run <code>preprocess.py</code>; the split and settings are recorded in <code>split.json</code>.</li>
-  <li><b>CycleGAN / CUT:</b> clone the official repos at the commits in <code>upstream_versions.txt</code>, apply <code>patches/cut_grayscale.patch</code> to CUT, then run <code>cyclegan_v1.sbatch</code> and <code>cut_v1.sbatch</code>, followed by <code>run_test.sbatch</code>.</li>
+  <li><b>Data:</b> request BraTS 2021 Task 1 from the official source (<a href="https://www.synapse.org/Synapse:syn25829067">Synapse</a>) and accept its terms; we used the same training set from the <a href="https://www.kaggle.com/datasets/dschettler8845/brats-2021-task1">Kaggle mirror</a>. Run <code>preprocess.py</code>; the split and settings are recorded in <code>split.json</code>.</li>
+  <li><b>CycleGAN / CUT:</b> clone the official repos at the commits in <code>upstream_versions.txt</code>, apply <code>patches/cut_grayscale.patch</code> to CUT, then run <code>cyclegan_v1.sbatch</code>, <code>cut_v1.sbatch</code> and <code>run_test.sbatch</code>.</li>
   <li><b>SynDiff:</b> clone <a href="https://github.com/icon-lab/SynDiff">icon-lab/SynDiff</a> at the pinned commit, convert data with <code>diffusion/make_mat.py</code>, train with <code>diffusion/syndiff_train.sbatch</code> (original) or <code>diffusion/syndiff_sc_train.sbatch n7514 30 silhouette 0.5</code> (ours), and generate with <code>diffusion/syndiff_infer.sbatch</code>.</li>
   <li><b>Score:</b> <code>evaluate.py</code> (brain-masked SSIM / PSNR / MAE), <code>diffusion/align_to_input.py</code> (input-only re-alignment) and <code>scripts/wilcoxon_per_patient.py</code> (the per-patient test).</li>
 </ol>
@@ -1135,7 +1163,7 @@ python scripts/wilcoxon_per_patient.py</code></pre>
 <p class="small">Step-by-step commands are in the repository's <code>README.md</code>, <code>gan/README.md</code> and <code>diffusion/README.md</code>.</p>
 
 <h2 id="ack">Acknowledgements</h2>
-<p>We thank Dr. Siyu Huang for the course and for feedback during the project, and Clemson University's Palmetto 2 cluster for the GPU time that made these experiments possible. We are grateful to the BraTS organisers and data contributors, and to the authors of CycleGAN, CUT and SynDiff for releasing their code. The format of this post was inspired by Christopher Olah's <a href="https://colah.github.io/posts/2015-08-Understanding-LSTMs/">"Understanding LSTM Networks"</a> and Andrej Karpathy's <a href="https://karpathy.github.io/2015/05/21/rnn-effectiveness/">"The Unreasonable Effectiveness of Recurrent Neural Networks"</a>.</p>
+<p>We thank Dr. Siyu Huang for the course and for feedback during the project, Clemson University's Palmetto 2 cluster for GPU time, the BraTS organisers and data contributors, and the authors of CycleGAN, CUT and SynDiff for releasing their code. This post's format was inspired by Christopher Olah's <a href="https://colah.github.io/posts/2015-08-Understanding-LSTMs/">"Understanding LSTM Networks"</a> and Andrej Karpathy's <a href="https://karpathy.github.io/2015/05/21/rnn-effectiveness/">"The Unreasonable Effectiveness of Recurrent Neural Networks"</a>.</p>
 
 <h2 id="refs">References</h2>
 <ol class="refs">
@@ -1162,6 +1190,8 @@ python scripts/wilcoxon_per_patient.py</code></pre>
   <li>M.-Y. Liu, T. Breuel, J. Kautz. Unsupervised Image-to-Image Translation Networks (UNIT). NeurIPS 2017. <a href="https://arxiv.org/abs/1703.00848">arXiv:1703.00848</a></li>
   <li>X. Huang, M.-Y. Liu, S. Belongie, J. Kautz. Multimodal Unsupervised Image-to-Image Translation (MUNIT). ECCV 2018. <a href="https://arxiv.org/abs/1804.04732">arXiv:1804.04732</a></li>
   <li>Y. A. Mejjati, C. Richardt, J. Tompkin, D. Cosker, K. I. Kim. Unsupervised Attention-guided Image-to-Image Translation. NeurIPS 2018. <a href="https://arxiv.org/abs/1806.02311">arXiv:1806.02311</a></li>
+  <li>B. Kim, G. Kwon, K. Kim, J. C. Ye. Unpaired Image-to-Image Translation via Neural Schrödinger Bridge (UNSB). ICLR 2024. <a href="https://arxiv.org/abs/2305.15086">arXiv:2305.15086</a></li>
+  <li>Y. Li, H.-C. Shao, X. Liang, L. Chen, R. Li, S. Jiang, J. Wang, Y. Zhang. Zero-Shot Medical Image Translation via Frequency-Guided Diffusion Models (FGDM). IEEE Transactions on Medical Imaging 43(3), 2024. <a href="https://doi.org/10.1109/TMI.2023.3325703">doi:10.1109/TMI.2023.3325703</a> · <a href="https://arxiv.org/abs/2304.02742">arXiv:2304.02742</a></li>
 </ol>
 
 <footer>
