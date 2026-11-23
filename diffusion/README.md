@@ -157,7 +157,9 @@ It takes about 0.2 s per slice (the 200 eval slices take under a minute).
 ### 7. Why the shift happens, and the fix (a position-preserving loss)
 
 **Cause (confirmed).** Nothing in SynDiff's losses fixes where the anatomy sits:
-- The adversarial losses use patch discriminators, which judge local realism and barely see position.
+- The adversarial losses judge realism, not position. The translation networks' discriminators are PatchGANs
+  (local patches); the diffusive discriminators (`Discriminator_large`) sum their features over all positions and
+  give one score per image.
 - The cycle loss only needs the two translation networks to undo each other, so if `gen_non_diffusive_1to2`
   shifts by s and `gen_non_diffusive_2to1` by −s, the cycle still closes.
 
