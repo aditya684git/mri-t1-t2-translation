@@ -47,9 +47,9 @@ h4 { font-size: 18px; margin: 28px 0 4px; }
 p { margin: 0 0 1em; }
 ul, ol { padding-left: 1.3em; margin: 0 0 1em; }
 li { margin: 0.25em 0; }
-.tldr { font-family: var(--sans); font-size: 16.5px; line-height: 1.55; background: #f2f8f5; border: 1px solid #bfe3d3; border-left: 6px solid var(--sil); border-radius: 8px; padding: 18px 22px 8px; margin: 28px 0 24px; }
-.tldr h2 { font-size: 18px; margin: 0 0 8px; padding: 0; border: 0; text-transform: uppercase; letter-spacing: 0.06em; color: #0a6b4f; }
-.tldr ul { padding-left: 1.1em; }
+.key-findings { font-family: var(--sans); font-size: 16.5px; line-height: 1.55; background: #f2f8f5; border: 1px solid #bfe3d3; border-left: 6px solid var(--sil); border-radius: 8px; padding: 18px 22px 8px; margin: 28px 0 24px; }
+.key-findings h2 { font-size: 18px; margin: 0 0 8px; padding: 0; border: 0; text-transform: uppercase; letter-spacing: 0.06em; color: #0a6b4f; }
+.key-findings ul { padding-left: 1.1em; }
 nav.toc { font-family: var(--sans); font-size: 15.5px; background: var(--faint); border-radius: 8px; padding: 14px 22px; margin: 0 0 8px; }
 nav.toc strong { display: block; margin-bottom: 4px; }
 nav.toc ol { margin: 0; padding-left: 0; list-style: none; columns: 2 260px; column-gap: 28px; }
@@ -208,8 +208,8 @@ window.MathJax = {
   Code, results and figures: <a href="https://github.com/aditya684git/mri-t1-t2-translation">github.com/aditya684git/mri-t1-t2-translation</a></p>
 </header>
 
-<section class="tldr" aria-labelledby="tldr-h">
-  <h2 id="tldr-h">TL;DR</h2>
+<section class="key-findings" aria-labelledby="key-findings">
+  <h2 id="key-findings">Key findings</h2>
   <ul>
     <li>We trained computers to <b>turn one kind of brain MRI scan (T1) into another (T2)</b>, using only <em>unmatched</em> scans: the T1s and the T2s came from different patients.</li>
     <li>We compared three methods on exactly the same data, scoring only inside the brain: <span class="m m-cyc">CycleGAN</span>, <span class="m m-cut">CUT</span> and the diffusion model <span class="m m-sd">SynDiff</span>.</li>
