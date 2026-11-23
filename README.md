@@ -14,7 +14,7 @@ CPSC 8810 (ML-based Image Synthesis), Clemson University, Fall 2026.
 
 **Blog post:** <https://aditya684git.github.io/mri-t1-t2-translation/>
 
-![Input T1, each model's generated T2, real T2, and error maps](figures/final_four_models.png)
+![Brain SSIM, PSNR and MAE on the 200 test slices for CUT, CycleGAN, SynDiff original, SynDiff original re-aligned, and SynDiff + silhouette loss, with 95% confidence intervals](figures/slides/main_results.png)
 
 ---
 

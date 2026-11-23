@@ -20,6 +20,7 @@ import argparse
 import csv
 import os
 import re
+from decimal import Decimal, ROUND_HALF_UP
 
 import matplotlib
 matplotlib.use("Agg")
@@ -124,10 +125,15 @@ def main_results(out_dir):
     table = results_table()
     fig, axes = plt.subplots(1, 3, figsize=(16, 6.4))
     for ax, (metric, title, better) in zip(axes, METRICS):
-        heights, errs = [], []
+        heights, errs, labels = [], [], []
+        dec = 2 if metric == "psnr" else 3
         for run, _, _ in MODELS:
             pm = patient_means(run, metric)
-            h = float(table[run][f"{metric}_mean"])
+            text = table[run][f"{metric}_mean"]
+            h = float(text)
+            # round the CSV's decimal text half-up (0.1455 -> 0.146), as in the README tables;
+            # formatting the float would give 0.145 because 0.1455 is stored as 0.14549...
+            labels.append(str(Decimal(text).quantize(Decimal(1).scaleb(-dec), rounding=ROUND_HALF_UP)))
             # every patient has the same number of eval slices, so the slice mean equals the patient mean
             assert abs(h - np.mean(list(pm.values()))) < 2e-3, (run, metric)
             heights.append(h)
@@ -135,9 +141,8 @@ def main_results(out_dir):
         x = np.arange(len(MODELS))
         ax.bar(x, heights, yerr=errs, color=[c for *_, c in MODELS], width=0.75, capsize=6,
                error_kw={"elinewidth": 1.8, "ecolor": "#333333"})
-        dec = 2 if metric == "psnr" else 3
-        for xi, h, e in zip(x, heights, errs):
-            ax.text(xi, h + e + 0.015 * (ax.get_ylim()[1]), f"{h:.{dec}f}", ha="center", va="bottom", fontsize=14)
+        for xi, h, e, label in zip(x, heights, errs, labels):
+            ax.text(xi, h + e + 0.015 * (ax.get_ylim()[1]), label, ha="center", va="bottom", fontsize=14)
         ax.set_title(title, pad=34)
         ax.text(0.5, 1.02, better, transform=ax.transAxes, ha="center", va="bottom", fontsize=17, color="#333333")
         ax.set_xticks([])
