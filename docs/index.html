@@ -1101,7 +1101,7 @@ window.MathJax = {
 <p>The pattern also matches. In both studies, SynDiff (in our case, with the silhouette loss) is slightly ahead of the cycle-consistent GAN. The unfixed SynDiff is the odd one out, and its whole-image score (77.3%) is where the shift shows.</p>
 </details>
 
-<div class="learned"><strong>What we learned</strong>With the silhouette loss, SynDiff needs no post-processing and has the best SSIM in our single-run comparison. The SSIM gain over CycleGAN is consistent (17 of 20 patients, p = 0.00017). Its average PSNR and MAE are also slightly better, but <em>not</em> significantly (12 of 20 patients each, p = 0.28 and 0.29), so on intensity error the two models are about level. Our claim is the structural (SSIM) one.</div>
+<div class="learned"><strong>What we learned</strong>With the silhouette loss, SynDiff needs no post-processing and has the best SSIM in our single-run comparison. Its SSIM gain over CycleGAN holds for most patients, not just on average. Its PSNR and MAE are only slightly better and the difference is <em>not</em> statistically significant, so on intensity error the two models are about level. Our claim is the structural (SSIM) one.</div>
 
 <h3 id="exp7">4.7 Experiment 7: Does the amount of data matter?</h3>
 
@@ -1129,7 +1129,7 @@ window.MathJax = {
   <li><b>One training run per model.</b> We did not measure run-to-run variation, and the shift itself varied between runs. The p-value compares patients, not training runs.</li>
   <li><b>2D slices.</b> Each slice is translated on its own, with no 3D context, so neighbouring slices may not be perfectly consistent.</li>
   <li><b>Patients differ in brightness.</b> The real T2's median brain brightness ranges from 0.18 to 0.66 across test patients, and no model predicts this. Pixel-wise scores punish it for every model.</li>
-  <li><b>CycleGAN and CUT used default settings.</b> They were not heavily tuned, so "CUT did much worse than CycleGAN" describes CUT at its defaults on this task.</li>
+  <li><b>Uneven tuning.</b> SynDiff + silhouette loss got a 4-setting loss sweep chosen on validation patients and the data-size experiment (500, 2,000 and 7,514 slices). CycleGAN and CUT each ran once, on default settings, at full data only. So "CUT did much worse than CycleGAN" describes CUT at its defaults, and the SSIM margin of SynDiff + silhouette loss over CycleGAN should be read with this uneven effort in mind.</li>
   <li><b>Modest test set.</b> We score a fixed subset of 20 of the 80 held-out patients (200 slices), fixed before any results so that every run is scored on the same slices. Only the SSIM difference with CycleGAN is statistically significant.</li>
   <li><b>Hand-set silhouette constants.</b> The threshold (0.03) and sharpness (0.006) were set by hand, not tuned.</li>
   <li><b>No tumour-region score.</b> All our scores average over the whole brain. We did not score the tumour region separately, so we can't say how faithfully each model reproduces the tumour itself.</li>
