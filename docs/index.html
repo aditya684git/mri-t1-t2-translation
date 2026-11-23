@@ -190,7 +190,7 @@ window.MathJax = {
     <li>We trained computers to <b>turn one kind of brain MRI scan (T1) into another (T2)</b>, using only <em>unmatched</em> scans: the T1s and the T2s came from different patients.</li>
     <li>We compared three methods on exactly the same data, scoring only inside the brain: <span class="m m-cyc">CycleGAN</span>, <span class="m m-cut">CUT</span> and the diffusion model <span class="m m-sd">SynDiff</span>.</li>
     <li><b>Surprise 1:</b> CUT, which we expected to win, did much worse than CycleGAN (brain SSIM 0.146 vs 0.512). It keeps T1's fine light-and-dark pattern instead of flipping it the way a real T2 does.</li>
-    <li><b>Surprise 2:</b> SynDiff's images looked excellent but scored worst of all (0.105). Every output sat about 8 pixels too far right and 2 pixels too high. Its two translation directions learned equal and opposite shifts, which cancel on a round trip, so training never noticed.</li>
+    <li><b>Surprise 2:</b> SynDiff's images looked excellent but scored worst of all (0.105). Every T1 → T2 output sat about 8 pixels too far right and 2 pixels too high. Its two translation directions learned equal and opposite shifts, which cancel on a round trip, so training never noticed.</li>
     <li><b>The fix:</b> a <em>silhouette loss</em>, which says "the brain outline of every output must sit where its input's outline sits". It removed the shift from all four of SynDiff's generators. <span class="m m-sil">SynDiff + silhouette loss</span> reached brain SSIM 0.543 and beat CycleGAN on 17 of 20 test patients (p = 0.00017). On PSNR and MAE the two are about level.</li>
   </ul>
 </section>
@@ -571,20 +571,20 @@ window.MathJax = {
     <text x="195" y="76" text-anchor="middle" font-size="14" font-weight="700" fill="#D55E00">G</text>
     <text x="285" y="22" text-anchor="middle" font-size="14" font-weight="700" fill="#1f2328">output G(s), shifted</text>
     <rect x="240" y="30" width="90" height="108" rx="5" fill="#000"/>
-    <g clip-path="url(#clip-gs)"><use href="#brain-t2" x="228" y="30" width="90" height="108"/></g>
+    <g clip-path="url(#clip-gs)"><use href="#brain-t2" x="252" y="30" width="90" height="108"/></g>
     <ellipse cx="285" cy="84" rx="36" ry="45" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="4 3"/>
     <line x1="105" y1="142" x2="105" y2="174" stroke="#444" stroke-width="2" marker-end="url(#ar)"/>
     <line x1="285" y1="142" x2="285" y2="174" stroke="#444" stroke-width="2" marker-end="url(#ar)"/>
     <text x="113" y="163" font-size="12" fill="#59636e">mask</text>
     <text x="293" y="163" font-size="12" fill="#59636e">soft mask</text>
     <rect x="60" y="180" width="90" height="108" rx="5" fill="#000"/><ellipse cx="105" cy="234" rx="36" ry="45" fill="#fff"/>
-    <rect x="240" y="180" width="90" height="108" rx="5" fill="#000"/><ellipse cx="273" cy="234" rx="36" ry="45" fill="#fff" filter="url(#soft)"/>
+    <rect x="240" y="180" width="90" height="108" rx="5" fill="#000"/><ellipse cx="297" cy="234" rx="36" ry="45" fill="#fff" filter="url(#soft)"/>
     <text x="195" y="240" text-anchor="middle" font-size="14" fill="#59636e">compare</text>
     <line x1="334" y1="234" x2="436" y2="234" stroke="#009E73" stroke-width="3"/>
     <path d="M428 226 L440 234 L428 242 z" fill="#009E73"/>
     <text x="385" y="226" text-anchor="middle" font-size="13" fill="#009E73">difference</text>
     <rect x="440" y="180" width="90" height="108" rx="5" fill="#000"/>
-    <path fill-rule="evenodd" fill="#009E73" d="M449 234 a36 45 0 1 0 72 0 a36 45 0 1 0 -72 0 Z M437 234 a36 45 0 1 0 72 0 a36 45 0 1 0 -72 0 Z"/>
+    <path fill-rule="evenodd" fill="#009E73" d="M449 234 a36 45 0 1 0 72 0 a36 45 0 1 0 -72 0 Z M461 234 a36 45 0 1 0 72 0 a36 45 0 1 0 -72 0 Z"/>
     <text x="105" y="308" text-anchor="middle" font-size="13" fill="#1f2328">M(s) = [s &gt; 0]</text>
     <text x="285" y="308" text-anchor="middle" font-size="13" fill="#1f2328">m(G(s))</text>
     <text x="485" y="308" text-anchor="middle" font-size="13" fill="#1f2328">|m(G(s)) − M(s)|</text>
@@ -594,7 +594,7 @@ window.MathJax = {
     <text x="552" y="272" font-size="13" fill="#59636e">outlines line up</text>
   </svg>
   </div>
-  <figcaption><b>Figure 6.</b> The silhouette loss (our drawing; the shift is exaggerated). The input and output are each reduced to a brain mask. Where an output sits too far left, the masks disagree along two thin crescents (green), and the loss is their average area. The anatomy <em>inside</em> the outline is not compared at all.</figcaption>
+  <figcaption><b>Figure 6.</b> The silhouette loss (our drawing; the shift is exaggerated). The input and output are each reduced to a brain mask. Where an output sits too far right, as SynDiff's T1 → T2 outputs did, the masks disagree along two thin crescents (green), and the loss is their average area. The anatomy <em>inside</em> the outline is not compared at all.</figcaption>
 </figure>
 
 <p><b>Design choices and assumptions.</b></p>
@@ -761,7 +761,7 @@ window.MathJax = {
 <figure class="wide" id="fig12">
   <div class="diagram">
   <svg viewBox="0 0 760 420" role="img" aria-labelledby="fig12-t">
-    <title id="fig12-t">Shift cartoon. Top: during training, G shifts the brain left and F shifts it right, so the round trip returns the original and the cycle loss is zero. Bottom: at test time the shifted output is compared with the real T2 and the outlines do not match.</title>
+    <title id="fig12-t">Shift cartoon. Top: during training, the T1 to T2 network shifts the brain right and the T2 to T1 network shifts it back left, so the round trip returns the original and the cycle loss is zero. Bottom: at test time the shifted output is compared with the real T2 and the outlines do not match.</title>
     <defs>
       <clipPath id="clip-e1"><rect x="270" y="50" width="90" height="108" rx="5"/></clipPath>
       <clipPath id="clip-e2"><rect x="270" y="268" width="90" height="108" rx="5"/></clipPath>
