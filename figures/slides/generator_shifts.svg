@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-11-03T14:50:13.323843</dc:date>
+    <dc:date>2026-11-26T06:32:23.982989</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -35,7 +35,7 @@ L 569.203062 102.97966
 L 569.203062 164.710403 
 L 329.635062 164.710403 
 z
-" clip-path="url(#p0c4f8c1696)" style="fill: #d55e00; opacity: 0.13; stroke: #d55e00; stroke-width: 2; stroke-linejoin: miter"/>
+" clip-path="url(#pae83b56c59)" style="fill: #d55e00; opacity: 0.13; stroke: #d55e00; stroke-width: 2; stroke-linejoin: miter"/>
    </g>
    <g id="patch_3">
     <path d="M 590.035062 102.97966 
@@ -43,7 +43,7 @@ L 829.603062 102.97966
 L 829.603062 164.710403 
 L 590.035062 164.710403 
 z
-" clip-path="url(#p0c4f8c1696)" style="fill: #009e73; opacity: 0.13; stroke: #009e73; stroke-width: 2; stroke-linejoin: miter"/>
+" clip-path="url(#pae83b56c59)" style="fill: #009e73; opacity: 0.13; stroke: #009e73; stroke-width: 2; stroke-linejoin: miter"/>
    </g>
    <g id="patch_4">
     <path d="M 329.635062 173.128231 
@@ -51,7 +51,7 @@ L 569.203062 173.128231
 L 569.203062 234.858974 
 L 329.635062 234.858974 
 z
-" clip-path="url(#p0c4f8c1696)" style="fill: #d55e00; opacity: 0.13; stroke: #d55e00; stroke-width: 2; stroke-linejoin: miter"/>
+" clip-path="url(#pae83b56c59)" style="fill: #d55e00; opacity: 0.13; stroke: #d55e00; stroke-width: 2; stroke-linejoin: miter"/>
    </g>
    <g id="patch_5">
     <path d="M 590.035062 173.128231 
@@ -59,7 +59,7 @@ L 829.603062 173.128231
 L 829.603062 234.858974 
 L 590.035062 234.858974 
 z
-" clip-path="url(#p0c4f8c1696)" style="fill: #009e73; opacity: 0.13; stroke: #009e73; stroke-width: 2; stroke-linejoin: miter"/>
+" clip-path="url(#pae83b56c59)" style="fill: #009e73; opacity: 0.13; stroke: #009e73; stroke-width: 2; stroke-linejoin: miter"/>
    </g>
    <g id="patch_6">
     <path d="M 329.635062 243.276803 
@@ -67,7 +67,7 @@ L 569.203062 243.276803
 L 569.203062 305.007546 
 L 329.635062 305.007546 
 z
-" clip-path="url(#p0c4f8c1696)" style="fill: #d55e00; opacity: 0.13; stroke: #d55e00; stroke-width: 2; stroke-linejoin: miter"/>
+" clip-path="url(#pae83b56c59)" style="fill: #d55e00; opacity: 0.13; stroke: #d55e00; stroke-width: 2; stroke-linejoin: miter"/>
    </g>
    <g id="patch_7">
     <path d="M 590.035062 243.276803 
@@ -75,7 +75,7 @@ L 829.603062 243.276803
 L 829.603062 305.007546 
 L 590.035062 305.007546 
 z
-" clip-path="url(#p0c4f8c1696)" style="fill: #009e73; opacity: 0.13; stroke: #009e73; stroke-width: 2; stroke-linejoin: miter"/>
+" clip-path="url(#pae83b56c59)" style="fill: #009e73; opacity: 0.13; stroke: #009e73; stroke-width: 2; stroke-linejoin: miter"/>
    </g>
    <g id="patch_8">
     <path d="M 329.635062 313.425374 
@@ -83,7 +83,7 @@ L 569.203062 313.425374
 L 569.203062 375.156117 
 L 329.635062 375.156117 
 z
-" clip-path="url(#p0c4f8c1696)" style="fill: #d55e00; opacity: 0.13; stroke: #d55e00; stroke-width: 2; stroke-linejoin: miter"/>
+" clip-path="url(#pae83b56c59)" style="fill: #d55e00; opacity: 0.13; stroke: #d55e00; stroke-width: 2; stroke-linejoin: miter"/>
    </g>
    <g id="patch_9">
     <path d="M 590.035062 313.425374 
@@ -91,7 +91,7 @@ L 829.603062 313.425374
 L 829.603062 375.156117 
 L 590.035062 375.156117 
 z
-" clip-path="url(#p0c4f8c1696)" style="fill: #009e73; opacity: 0.13; stroke: #009e73; stroke-width: 2; stroke-linejoin: miter"/>
+" clip-path="url(#pae83b56c59)" style="fill: #009e73; opacity: 0.13; stroke: #009e73; stroke-width: 2; stroke-linejoin: miter"/>
    </g>
    <g id="text_1">
     <text style="font-weight: 700; font-size: 18px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start" x="71.839062" y="72.030138" transform="rotate(-0 71.839062 72.030138)">generator</text>
@@ -112,13 +112,13 @@ z
     <text style="font-weight: 700; font-size: 24px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #d55e00" x="449.419062" y="127.840788" transform="rotate(-0 449.419062 127.840788)">(+2, −8)</text>
    </g>
    <g id="text_7">
-    <text style="font-size: 14px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #333333" x="449.419062" y="151.737871" transform="rotate(-0 449.419062 151.737871)">SSIM 0.088 → 0.519 when moved back</text>
+    <text style="font-size: 11.5px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #333333" x="449.419062" y="151.048027" transform="rotate(-0 449.419062 151.048027)">SSIM 0.088 → 0.519 if moved back</text>
    </g>
    <g id="text_8">
     <text style="font-weight: 700; font-size: 24px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #009e73" x="709.819062" y="127.840788" transform="rotate(-0 709.819062 127.840788)">(0, 0)</text>
    </g>
    <g id="text_9">
-    <text style="font-size: 14px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #333333" x="709.819062" y="151.737871" transform="rotate(-0 709.819062 151.737871)">SSIM 0.548 as output (best)</text>
+    <text style="font-size: 11.5px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #333333" x="709.819062" y="151.048027" transform="rotate(-0 709.819062 151.048027)">SSIM 0.548 as output (best)</text>
    </g>
    <g id="text_10">
     <text style="font-size: 18px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start" x="71.839062" y="189.318878" transform="rotate(-0 71.839062 189.318878)">translation (cycle)</text>
@@ -130,13 +130,13 @@ z
     <text style="font-weight: 700; font-size: 24px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #d55e00" x="449.419062" y="197.98936" transform="rotate(-0 449.419062 197.98936)">(+2, −8)</text>
    </g>
    <g id="text_13">
-    <text style="font-size: 14px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #333333" x="449.419062" y="221.886442" transform="rotate(-0 449.419062 221.886442)">SSIM 0.097 → 0.423 when moved back</text>
+    <text style="font-size: 11.5px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #333333" x="449.419062" y="221.196598" transform="rotate(-0 449.419062 221.196598)">SSIM 0.097 → 0.423 if moved back</text>
    </g>
    <g id="text_14">
     <text style="font-weight: 700; font-size: 24px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #009e73" x="709.819062" y="197.98936" transform="rotate(-0 709.819062 197.98936)">(0, 0)</text>
    </g>
    <g id="text_15">
-    <text style="font-size: 14px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #333333" x="709.819062" y="221.886442" transform="rotate(-0 709.819062 221.886442)">SSIM 0.426 as output (best)</text>
+    <text style="font-size: 11.5px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #333333" x="709.819062" y="221.196598" transform="rotate(-0 709.819062 221.196598)">SSIM 0.426 as output (best)</text>
    </g>
    <g id="text_16">
     <text style="font-size: 18px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start" x="71.839062" y="259.467449" transform="rotate(-0 71.839062 259.467449)">diffusive</text>
@@ -148,13 +148,13 @@ z
     <text style="font-weight: 700; font-size: 24px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #d55e00" x="449.419062" y="268.137931" transform="rotate(-0 449.419062 268.137931)">(−2, +8)</text>
    </g>
    <g id="text_19">
-    <text style="font-size: 14px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #333333" x="449.419062" y="292.035013" transform="rotate(-0 449.419062 292.035013)">SSIM 0.075 → 0.536 when moved back</text>
+    <text style="font-size: 11.5px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #333333" x="449.419062" y="291.34517" transform="rotate(-0 449.419062 291.34517)">SSIM 0.075 → 0.536 if moved back</text>
    </g>
    <g id="text_20">
     <text style="font-weight: 700; font-size: 24px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #009e73" x="709.819062" y="268.137931" transform="rotate(-0 709.819062 268.137931)">(0, 0)</text>
    </g>
    <g id="text_21">
-    <text style="font-size: 14px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #333333" x="709.819062" y="292.035013" transform="rotate(-0 709.819062 292.035013)">SSIM 0.548 as output (best)</text>
+    <text style="font-size: 11.5px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #333333" x="709.819062" y="291.34517" transform="rotate(-0 709.819062 291.34517)">SSIM 0.548 as output (best)</text>
    </g>
    <g id="text_22">
     <text style="font-size: 18px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start" x="71.839062" y="329.616021" transform="rotate(-0 71.839062 329.616021)">translation (cycle)</text>
@@ -166,13 +166,13 @@ z
     <text style="font-weight: 700; font-size: 24px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #d55e00" x="449.419062" y="338.286503" transform="rotate(-0 449.419062 338.286503)">(−2, +8)</text>
    </g>
    <g id="text_25">
-    <text style="font-size: 14px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #333333" x="449.419062" y="362.183585" transform="rotate(-0 449.419062 362.183585)">SSIM 0.073 → 0.448 when moved back</text>
+    <text style="font-size: 11.5px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #333333" x="449.419062" y="361.493741" transform="rotate(-0 449.419062 361.493741)">SSIM 0.073 → 0.448 if moved back</text>
    </g>
    <g id="text_26">
     <text style="font-weight: 700; font-size: 24px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #009e73" x="709.819062" y="338.286503" transform="rotate(-0 709.819062 338.286503)">(0, 0)</text>
    </g>
    <g id="text_27">
-    <text style="font-size: 14px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #333333" x="709.819062" y="362.183585" transform="rotate(-0 709.819062 362.183585)">SSIM 0.471 as output (best)</text>
+    <text style="font-size: 11.5px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #333333" x="709.819062" y="361.493741" transform="rotate(-0 709.819062 361.493741)">SSIM 0.471 as output (best)</text>
    </g>
    <g id="text_28">
     <text style="font-weight: 700; font-size: 19px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle" x="449.419062" y="21.637031" transform="rotate(-0 449.419062 21.637031)">Best alignment shift (dy, dx) of each generator, full data, epoch 30 (50 eval slices)</text>
@@ -180,7 +180,7 @@ z
   </g>
  </g>
  <defs>
-  <clipPath id="p0c4f8c1696">
+  <clipPath id="pae83b56c59">
    <rect x="58.819062" y="35.637031" width="781.2" height="343.728"/>
   </clipPath>
  </defs>

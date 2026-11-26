@@ -203,23 +203,44 @@ def generator_shifts(out_dir):
     ax.text(0.05, 0.45, "generator", fontsize=18, fontweight="bold", va="center")
     for col, (label, colour) in enumerate((("SynDiff original", ORIGINAL), ("SynDiff + silhouette loss", FIXED)), 1):
         ax.text(col + 0.5, 0.45, label, fontsize=18, fontweight="bold", ha="center", va="center", color=colour)
+    cells = []  # (text artist, box) pairs, shrunk to fit below
     for i, key in enumerate(order, 1):
         o, f = orig[key], fixed[key]
         ax.text(0.05, i + 0.12, names[key], fontsize=18, va="center")
         ax.text(0.05, i + 0.48, f"{o['what'].replace('->', ' → ')}, vs real {o['target']}", fontsize=15,
                 color="#555555", va="center")
         for col, (b, colour) in enumerate(((o, ORIGINAL), (f, FIXED)), 1):
-            ax.add_patch(Rectangle((col + 0.04, i - 0.04), 0.92, 0.88, facecolor=colour, alpha=0.13,
-                                   edgecolor=colour, linewidth=2))
-            ax.text(col + 0.5, i + 0.22, fmt_shift(b["best"]), fontsize=24, fontweight="bold", ha="center",
-                    va="center", color=colour)
-            sub = (f"SSIM {b['ssim_0']:.3f} → {b['ssim_best']:.3f} when moved back" if b["best"] != (0, 0)
+            box = Rectangle((col + 0.04, i - 0.04), 0.92, 0.88, facecolor=colour, alpha=0.13,
+                            edgecolor=colour, linewidth=2)
+            ax.add_patch(box)
+            t1 = ax.text(col + 0.5, i + 0.22, fmt_shift(b["best"]), fontsize=24, fontweight="bold", ha="center",
+                         va="center", color=colour)
+            sub = (f"SSIM {b['ssim_0']:.3f} → {b['ssim_best']:.3f} if moved back" if b["best"] != (0, 0)
                    else f"SSIM {b['ssim_0']:.3f} as output (best)")
-            ax.text(col + 0.5, i + 0.6, sub, fontsize=14, ha="center", va="center", color="#333333")
+            t2 = ax.text(col + 0.5, i + 0.6, sub, fontsize=14, ha="center", va="center", color="#333333")
+            cells += [(t1, box), (t2, box)]
     n = orig[order[0]]["n_slices"]
     ax.set_title(f"Best alignment shift (dy, dx) of each generator, full data, epoch 30 ({n} eval slices)",
                  fontsize=19, pad=14)
+    fit_text_in_boxes(fig, cells)
     save(fig, out_dir, "generator_shifts")
+
+
+def fit_text_in_boxes(fig, cells, pad=0.08):
+    """Shrink each text until it fits inside its box with `pad` (fraction of the box width) on each side."""
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    start = {id(t): t.get_fontsize() for t, _ in cells}
+    for text, box in cells:
+        limit = box.get_window_extent(renderer).width * (1 - 2 * pad)
+        while text.get_window_extent(renderer).width > limit and text.get_fontsize() > 8:
+            text.set_fontsize(text.get_fontsize() - 0.5)
+    # texts that started at the same size end at the same size, so every cell looks alike
+    for size in set(start.values()):
+        group = [t for t, _ in cells if start[id(t)] == size]
+        smallest = min(t.get_fontsize() for t in group)
+        for t in group:
+            t.set_fontsize(smallest)
 
 
 def shift_drift_n500(out_dir):
@@ -244,12 +265,15 @@ def shift_drift_n500(out_dir):
     a2.set_ylabel("brain SSIM")
     for a in (a1, a2):
         a.set_xticks(ep)
-    a1.legend(frameon=False, loc="lower left")
-    a2.legend(frameon=False, loc="upper left")
+    # one shared legend below both panels, so it covers no data
+    handles, labels = a2.get_legend_handles_labels()
+    labels = ["SynDiff original (raw output)", "SynDiff + silhouette loss (raw output)",
+              "SynDiff original, aligned (right panel only)"]
+    fig.legend(handles, labels, loc="lower center", ncol=3, frameon=False, fontsize=14)
     n = v["syndiff_n500"][ep[0]]["n_slices"]
     fig.suptitle(f"500 training slices: the original drifts off-centre, the fix stays at 0 ({n} validation slices)",
                  fontsize=18, fontweight="normal")
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0.08, 1, 1))
     save(fig, out_dir, "shift_drift_n500")
 
 

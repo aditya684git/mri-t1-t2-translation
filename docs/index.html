@@ -850,7 +850,7 @@ window.MathJax = {
 </details>
 
 <figure class="wide" id="fig11">
-  <a class="zoom" href="assets/shift-drift-n500.png"><img src="assets/shift-drift-n500.png" width="1600" height="637" loading="lazy" alt="Left: median horizontal shift by epoch for the 500-slice runs; the original drifts from −1 to −5 pixels, the silhouette-loss run stays at 0. Right: validation SSIM by epoch; silhouette loss rises to 0.44, the original stays near 0.12 to 0.15 raw and reaches 0.29 after alignment."></a>
+  <a class="zoom" href="assets/shift-drift-n500.png"><img src="assets/shift-drift-n500.png" width="1600" height="650" loading="lazy" alt="Left: median horizontal shift by epoch for the 500-slice runs; the original drifts from −1 to −5 pixels, the silhouette-loss run stays at 0. Right: validation SSIM by epoch; silhouette loss rises to 0.44, the original stays near 0.12 to 0.15 raw and reaches 0.29 after alignment."></a>
   <figcaption><b>Figure 11.</b> The 500-slice runs, scored on the 241 validation slices every 5 epochs. <b>Left:</b> the median horizontal correction (dx) needed to line each output up with its input. The <span class="m m-sd">original</span> drifts steadily off-centre; the <span class="m m-sil">silhouette-loss</span> run stays at 0. <b>Right:</b> the original's raw SSIM stalls around 0.12–0.15 while its re-aligned score keeps improving (dashed). In other words, it keeps learning the anatomy while drifting off-centre. The silhouette-loss run rises past both.</figcaption>
 </figure>
 
